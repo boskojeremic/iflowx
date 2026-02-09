@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: ghg_postgres
+    environment:
+      POSTGRES_USER: ghg
+      POSTGRES_PASSWORD: ghg
+      POSTGRES_DB: ghg
+    ports:
+      - "5432:5432"
+    volumes:
+      - ghg_data:/var/lib/postgresql/data
+
+volumes:
+  ghg_data:
