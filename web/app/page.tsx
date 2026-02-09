@@ -123,7 +123,7 @@ export default function Page() {
             {/* BIGGER logo, transparent-friendly */}
             <div className="relative h-30 w-30 overflow-hidden rounded-xl bg-transparent ring-1 ring-white/10">
               <Image
-                src="/Logo.png"
+                src="/logo.png"
                 alt="DigitalOps Consulting"
                 fill
                 className="object-contain brand-logo"
