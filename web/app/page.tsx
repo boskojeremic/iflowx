@@ -129,7 +129,7 @@ export default function Page() {
         <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             {/* BIGGER logo, transparent-friendly */}
-            <div className="relative h-30 w-30 overflow-hidden rounded-xl bg-transparent ring-1 ring-white/10">
+            <div className="relative h-[120px] w-[120px] overflow-hidden rounded-xl bg-transparent ring-1 ring-white/10">
               <Image
                 src="/logo.png"
                 alt="DigitalOps Consulting"
