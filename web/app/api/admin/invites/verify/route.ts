@@ -15,7 +15,7 @@ function clampInt(v: unknown, min: number, max: number) {
 }
 
 export async function POST(req: Request) {
-  const session = await getServerSession(authOptions);
+  const session = (await getServerSession(authOptions)) as any;
   if (!session?.user?.email) {
     return NextResponse.json({ error: "UNAUTH" }, { status: 401 });
   }

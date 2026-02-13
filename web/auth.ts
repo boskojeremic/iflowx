@@ -6,7 +6,7 @@ import { db } from "@/lib/db";
 
 export const authOptions = {
   adapter: PrismaAdapter(db),
-  session: { strategy: "jwt" },
+  session: { strategy: "jwt" as const },
   providers: [
     Credentials({
       name: "Credentials",
@@ -30,11 +30,15 @@ export const authOptions = {
 
         if (!ok) return null;
 
-        return { id: user.id, email: user.email, name: user.name ?? undefined };
+        return {
+          id: String(user.id),
+          email: user.email,
+          name: user.name ?? undefined,
+        };
       },
     }),
   ],
   pages: { signIn: "/login" },
 };
 
-export const { handlers, auth, signIn, signOut } = NextAuth(authOptions);
+export const { handlers, auth, signIn, signOut } = NextAuth(authOptions as any);

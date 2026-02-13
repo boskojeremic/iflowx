@@ -1,13 +1,12 @@
-// lib/auth.ts
-import type { NextAuthOptions } from "next-auth";
+import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import bcrypt from "bcrypt";
 import { db } from "@/lib/db";
 
-export const authOptions: NextAuthOptions = {
+export const authOptions = {
   adapter: PrismaAdapter(db),
-  session: { strategy: "jwt" },
+  session: { strategy: "jwt" as const },
   providers: [
     Credentials({
       name: "Credentials",
@@ -19,37 +18,27 @@ export const authOptions: NextAuthOptions = {
         if (!credentials?.email || !credentials?.password) return null;
 
         const user = await db.user.findUnique({
-          where: { email: credentials.email },
+          where: { email: String(credentials.email) },
         });
 
-        if (!user || !user.passwordHash) return null;
+        if (!user?.passwordHash) return null;
 
         const ok = await bcrypt.compare(
-          credentials.password,
+          String(credentials.password),
           user.passwordHash
         );
 
         if (!ok) return null;
 
-        // PROVERA ACTIVE MEMBERSHIP (ključna stvar)
-        const activeMembership = await db.membership.findFirst({
-          where: {
-            userId: user.id,
-            status: "ACTIVE",
-          },
-        });
-
-        if (!activeMembership) return null;
-
         return {
-          id: user.id,
+          id: String(user.id),
           email: user.email,
           name: user.name ?? undefined,
         };
       },
     }),
   ],
-  pages: {
-    signIn: "/login",
-  },
+  pages: { signIn: "/login" },
 };
+
+export const { handlers, auth, signIn, signOut } = NextAuth(authOptions as any);

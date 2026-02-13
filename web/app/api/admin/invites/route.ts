@@ -7,8 +7,8 @@ import { requireAdmin } from "@/lib/rbac";
 import { sendInviteEmail } from "@/lib/email";
 
 export async function POST(req: Request) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.email)
+  const session = (await getServerSession(authOptions)) as any;
+if (!session?.user?.email)
     return NextResponse.json({ error: "UNAUTH" }, { status: 401 });
 
   const me = await db.user.findUnique({

@@ -13,7 +13,7 @@ function slugCode(x: string) {
 }
 
 async function getCurrentUser() {
-  const session = await getServerSession(authOptions);
+  const session = (await getServerSession(authOptions)) as any;
   const email = session?.user?.email;
   if (!email) return null;
 
@@ -57,7 +57,12 @@ export async function GET() {
     orderBy: { tenant: { createdAt: "desc" } },
   });
 
-  return NextResponse.json({ ok: true, tenants: rows.map((r) => r.tenant) });
+  type Row = { tenant: unknown };
+
+  return NextResponse.json({
+    ok: true,
+    tenants: (rows as Row[]).map((r) => r.tenant),
+  });
 }
 
 export async function POST(req: Request) {
