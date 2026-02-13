@@ -64,8 +64,7 @@ export async function POST(req: Request) {
       inviteUrl,
       tenantName: tenant?.name ?? "GHG App",
       role,
-      expiresAt,
-    });
+          });
 
     emailed = true;
   } catch (e) {
