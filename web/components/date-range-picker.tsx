@@ -1,78 +1,92 @@
-"use client"
+"use client";
 
-import * as React from "react"
+import { useEffect, useState } from "react";
 
-export type DateRangeValue = { from: Date; to: Date }
+type Props = {
+  from: Date | null;
+  to: Date | null;
+  onChange: (next: { from: Date | null; to: Date | null }) => void;
+  className?: string;
+};
 
-function toInputValue(d: Date) {
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, "0")
-  const day = String(d.getDate()).padStart(2, "0")
-  return `${y}-${m}-${day}`
+function toInputValue(d: Date | null) {
+  if (!d) return "";
+  return d.toISOString().slice(0, 10);
 }
 
-function fromInputValue(s: string) {
-  // expects YYYY-MM-DD
-  const [y, m, d] = s.split("-").map(Number)
-  const dt = new Date(y, (m ?? 1) - 1, d ?? 1)
-  dt.setHours(0, 0, 0, 0)
-  return dt
+function fromInputValue(v: string) {
+  if (!v) return null;
+  return new Date(v + "T00:00:00");
 }
 
-export function DateRangePicker({
-  value,
+export default function DateRangePicker({
+  from,
+  to,
   onChange,
-}: {
-  value: DateRangeValue
-  onChange: (v: DateRangeValue) => void
-}) {
-  const fromStr = toInputValue(value.from)
-  const toStr = toInputValue(value.to)
+  className,
+}: Props) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
+  if (!mounted) return null;
 
   return (
-    <div className="flex flex-wrap items-end gap-2">
-      <div className="min-w-[160px]">
-        <div className="mb-1 text-xs font-medium text-foreground/70">From</div>
+    <div
+      className={`flex items-end gap-4 p-4 rounded-xl border border-white/10 bg-black/40 ${className}`}
+    >
+      {/* FROM */}
+      <div className="flex flex-col gap-1">
+        <label className="text-xs text-gray-400">From</label>
         <input
           type="date"
-          value={fromStr}
-          onChange={(e) => {
-            const nextFrom = fromInputValue(e.target.value)
-            const next = nextFrom > value.to ? { from: value.to, to: nextFrom } : { from: nextFrom, to: value.to }
-            onChange(next)
-          }}
-          className="h-9 w-full rounded-md border border-white/10 bg-white/5 px-3 text-sm outline-none focus:ring-2 focus:ring-emerald-400/30"
+          value={toInputValue(from)}
+          onChange={(e) =>
+            onChange({
+              from: fromInputValue(e.target.value),
+              to,
+            })
+          }
+          className="border border-white/15 bg-black/30 text-white p-2 rounded-md"
         />
       </div>
 
-      <div className="min-w-[160px]">
-        <div className="mb-1 text-xs font-medium text-foreground/70">To</div>
+      {/* TO */}
+      <div className="flex flex-col gap-1">
+        <label className="text-xs text-gray-400">To</label>
         <input
           type="date"
-          value={toStr}
-          onChange={(e) => {
-            const nextTo = fromInputValue(e.target.value)
-            const next = value.from > nextTo ? { from: nextTo, to: value.from } : { from: value.from, to: nextTo }
-            onChange(next)
-          }}
-          className="h-9 w-full rounded-md border border-white/10 bg-white/5 px-3 text-sm outline-none focus:ring-2 focus:ring-emerald-400/30"
+          value={toInputValue(to)}
+          onChange={(e) =>
+            onChange({
+              from,
+              to: fromInputValue(e.target.value),
+            })
+          }
+          className="border border-white/15 bg-black/30 text-white p-2 rounded-md"
         />
       </div>
 
+      {/* TODAY */}
       <button
         type="button"
         onClick={() => {
-          const today = new Date()
-          today.setHours(0, 0, 0, 0)
-          const from = new Date(today)
-          from.setDate(from.getDate() - 90)
-          onChange({ from, to: today })
+          const today = new Date();
+          const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+          onChange({ from: firstDay, to: today });
         }}
-        className="h-9 rounded-md border border-white/10 bg-white/5 px-3 text-sm text-foreground hover:bg-white/10"
-        title="Reset to last 90 days"
+        className="px-3 py-2 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white text-sm"
       >
-        Reset
+        This Month
+      </button>
+
+      {/* RESET */}
+      <button
+        type="button"
+        onClick={() => onChange({ from: null, to: null })}
+        className="px-3 py-2 rounded-md bg-white/10 hover:bg-white/20 text-white text-sm"
+      >
+        Clear
       </button>
     </div>
-  )
+  );
 }
