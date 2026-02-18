@@ -9,20 +9,29 @@ type InviteEmailArgs = {
 
 function getResend() {
   const key = process.env.RESEND_API_KEY;
-  if (!key) return null;
+
+  // Hard fail in production so we don't silently "skip"
+  if (!key) {
+    const msg = "RESEND_API_KEY is missing";
+    console.error("[EMAIL]", msg, { nodeEnv: process.env.NODE_ENV });
+    throw new Error(msg);
+  }
+
   return new Resend(key);
 }
 
 export async function sendInviteEmail(args: InviteEmailArgs) {
+  console.log("[EMAIL] sendInviteEmail HIT", {
+    to: args.to,
+    tenantName: args.tenantName,
+    role: args.role,
+  });
+
   const resend = getResend();
-  if (!resend) {
-    console.warn("RESEND_API_KEY missing - skipping email send");
-    return { ok: false, skipped: true };
-  }
 
   const { to, inviteUrl, tenantName, role } = args;
 
-  await resend.emails.send({
+  const result = await resend.emails.send({
     from: "GHG App <no-reply@dig-ops.com>",
     to,
     subject: `Invitation to ${tenantName}`,
@@ -38,5 +47,14 @@ export async function sendInviteEmail(args: InviteEmailArgs) {
     `,
   });
 
-  return { ok: true };
+  console.log("[EMAIL] Resend result:", result);
+
+  // Resend SDK often returns { data, error }
+  const anyRes = result as any;
+  if (anyRes?.error) {
+    console.error("[EMAIL] Resend error:", anyRes.error);
+    throw new Error(anyRes.error?.message || "RESEND_SEND_ERROR");
+  }
+
+  return { ok: true, result };
 }
