@@ -7,16 +7,23 @@ type InviteEmailArgs = {
   role: string;
 };
 
-// Instantiate once (no null logic)
-const resend = new Resend(process.env.RESEND_API_KEY!);
-
 export async function sendInviteEmail(args: InviteEmailArgs) {
+  console.log("[EMAIL] HIT sendInviteEmail", { to: args.to });
+
+  const key = process.env.RESEND_API_KEY || "";
+  console.log("[EMAIL] RESEND_API_KEY present:", !!key);
+  console.log("[EMAIL] RESEND_API_KEY length:", key.length);
+  console.log("[EMAIL] RESEND key prefix:", key.slice(0, 6));
+
+  if (!key) {
+    throw new Error("RESEND_API_KEY is missing in runtime");
+  }
+
+  const resend = new Resend(key);
+
   const { to, inviteUrl, tenantName, role } = args;
 
-  console.log("[EMAIL] Sending invite to:", to);
-  console.log("[EMAIL] RESEND_API_KEY present:", !!process.env.RESEND_API_KEY);
-
-  const result = await resend.emails.send({
+  const payload = {
     from: "GHG App <no-reply@dig-ops.com>",
     to,
     subject: `Invitation to ${tenantName}`,
@@ -30,14 +37,24 @@ export async function sendInviteEmail(args: InviteEmailArgs) {
       <p>If the button does not work, open this link:</p>
       <p><a href="${inviteUrl}">${inviteUrl}</a></p>
     `,
+  };
+
+  console.log("[EMAIL] sending payload meta:", {
+    from: payload.from,
+    to: payload.to,
+    subject: payload.subject,
   });
+
+  const result = await resend.emails.send(payload as any);
 
   console.log("[EMAIL] Resend result:", result);
 
-  if ((result as any)?.error) {
-    console.error("[EMAIL] Resend error:", (result as any).error);
-    throw new Error((result as any).error?.message || "RESEND_ERROR");
+  // Resend can return { data, error } without throwing
+  const anyRes = result as any;
+  if (anyRes?.error) {
+    console.error("[EMAIL] Resend error:", anyRes.error);
+    throw new Error(anyRes.error?.message || "RESEND_SEND_ERROR");
   }
 
-  return { ok: true };
+  return { ok: true, result };
 }
