@@ -8,6 +8,20 @@ type TenantItem = {
   code: string;
 };
 
+type ValidityUnit = "DAYS" | "MONTHS" | "YEARS";
+type ValidityOption = { label: string; amount: number; unit: ValidityUnit };
+
+const VALIDITY_OPTIONS: ValidityOption[] = [
+  { label: "7 days", amount: 7, unit: "DAYS" },
+  { label: "14 days", amount: 14, unit: "DAYS" },
+  { label: "30 days", amount: 30, unit: "DAYS" },
+  { label: "3 months", amount: 3, unit: "MONTHS" },
+  { label: "6 months", amount: 6, unit: "MONTHS" },
+  { label: "12 months", amount: 12, unit: "MONTHS" },
+  { label: "1 year", amount: 1, unit: "YEARS" },
+  { label: "2 years", amount: 2, unit: "YEARS" },
+];
+
 export default function InvitePage() {
   const [tenants, setTenants] = useState<TenantItem[]>([]);
   const [tenantId, setTenantId] = useState("");
@@ -16,6 +30,8 @@ export default function InvitePage() {
   const [role, setRole] = useState("VIEWER");
   const [inviteUrl, setInviteUrl] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const [validityIndex, setValidityIndex] = useState<number>(0); // default 7 days
 
   // Load tenants for dropdown
   useEffect(() => {
@@ -36,6 +52,7 @@ export default function InvitePage() {
         console.error("Tenant load error:", e);
       }
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function createInvite() {
@@ -43,6 +60,8 @@ export default function InvitePage() {
     setLoading(true);
 
     try {
+      const v = VALIDITY_OPTIONS[validityIndex];
+
       const r = await fetch("/api/admin/invites", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -50,6 +69,7 @@ export default function InvitePage() {
           tenantId,
           email,
           role,
+          validity: { amount: v.amount, unit: v.unit },
         }),
       });
 
@@ -114,6 +134,20 @@ export default function InvitePage() {
         <option value="VIEWER">VIEWER</option>
       </select>
 
+      {/* VALIDITY */}
+      <label className="block text-sm font-medium mb-1">Validity</label>
+      <select
+        className="border p-2 w-full rounded mb-4"
+        value={validityIndex}
+        onChange={(e) => setValidityIndex(Number(e.target.value))}
+      >
+        {VALIDITY_OPTIONS.map((o, idx) => (
+          <option key={idx} value={idx}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+
       <button
         onClick={createInvite}
         disabled={loading || !tenantId || !email}
@@ -124,14 +158,11 @@ export default function InvitePage() {
 
       {/* RESULT */}
       {inviteUrl && (
-  <div className="mt-4 p-3 border rounded bg-black/70 text-white">
-    <div className="text-sm mb-1 text-gray-300">Invite link:</div>
-    <code className="break-all text-sm text-green-400">
-      {inviteUrl}
-    </code>
-  </div>
-)}
-
+        <div className="mt-4 p-3 border rounded bg-black/70 text-white">
+          <div className="text-sm mb-1 text-gray-300">Invite link:</div>
+          <code className="break-all text-sm text-green-400">{inviteUrl}</code>
+        </div>
+      )}
     </div>
   );
 }
