@@ -29,7 +29,7 @@ export default function AppSidebar() {
   return (
     <Sidebar collapsible="icon" className="bg-sidebar text-sidebar-foreground">
       <SidebarHeader className="px-3 py-3">
-        <div className="text-sm font-semibold tracking-wide">GHG App</div>
+        <div className="text-sm font-semibold tracking-wide">IFlowX</div>
         <div className="text-xs opacity-70">Pilot</div>
       </SidebarHeader>
 

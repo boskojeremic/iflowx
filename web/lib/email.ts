@@ -12,7 +12,7 @@ type InviteEmailArgs = {
   licenseStart: Date;
   licenseEnd: Date;
   issuedTo: string; // email
-  issuedBy?: string; // optional (npr. "GHG App Admin")
+  issuedBy?: string; // optional (npr. "IFlowX Admin")
 };
 
 function getResend() {
@@ -47,7 +47,7 @@ export async function sendInviteEmail(args: InviteEmailArgs) {
     licenseStart,
     licenseEnd,
     issuedTo,
-    issuedBy = "GHG App",
+    issuedBy = "IFlowX",
   } = args;
 
   const startStr = fmtDate(licenseStart);
@@ -101,12 +101,15 @@ export async function sendInviteEmail(args: InviteEmailArgs) {
   `;
 
   await resend.emails.send({
-    // ✅ bitno: FROM mora biti sa verifikovanog domena/subdomena u Resend-u
-    from: "GHG App <no-reply@mail.dig-ops.com>",
-    to,
-    subject,
-    html,
-  });
+  from: "IFlowX <no-reply@mail.dig-ops.com>",
+  to,
+  subject: `IFlowX access invitation — ${tenantName}`,
+  html: html,
+
+  headers: {
+    "List-Unsubscribe": "<mailto:no-reply@dig-ops.com>",
+  },
+});
 
   return { ok: true };
 }

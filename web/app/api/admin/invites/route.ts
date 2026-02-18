@@ -140,14 +140,14 @@ export async function POST(req: Request) {
       await sendInviteEmail({
         to: email,
         inviteUrl,
-        tenantName: tenant?.name ?? "GHG App",
+        tenantName: tenant?.name ?? "IFlowX",
         tenantCode: tenant?.code ?? undefined,
         role,
         productName: "IFlowX",
         licenseStart: invite.createdAt,
         licenseEnd: invite.expiresAt,
         issuedTo: email,
-        issuedBy: "GHG App Admin",
+        issuedBy: "IFlowX Admin",
       });
 
       emailed = true;
