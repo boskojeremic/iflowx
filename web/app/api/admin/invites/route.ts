@@ -23,8 +23,7 @@ function addMonthsSafe(d: Date, months: number) {
   const x = new Date(d);
   const day = x.getDate();
   x.setMonth(x.getMonth() + months);
-  // handle Jan 31 + 1 month -> clamp to last day
-  if (x.getDate() < day) x.setDate(0);
+  if (x.getDate() < day) x.setDate(0); // clamp end-of-month
   return x;
 }
 
@@ -32,8 +31,7 @@ function addYearsSafe(d: Date, years: number) {
   const x = new Date(d);
   const m = x.getMonth();
   x.setFullYear(x.getFullYear() + years);
-  // handle Feb 29 rollover
-  if (x.getMonth() !== m) x.setDate(0);
+  if (x.getMonth() !== m) x.setDate(0); // Feb 29 rollover
   return x;
 }
 
@@ -90,10 +88,11 @@ export async function POST(req: Request) {
     const rawUnit = String(body?.validity?.unit || "").toUpperCase();
     const unitOk = rawUnit === "DAYS" || rawUnit === "MONTHS" || rawUnit === "YEARS";
 
-    const amount = rawAmount ?? 7; // default 7 days
+    const amount = rawAmount ?? 7;
     const unit = (unitOk ? rawUnit : "DAYS") as ValidityUnit;
 
-    const expiresAt = computeExpiresAt(new Date(), { amount, unit });
+    const now = new Date();
+    const expiresAt = computeExpiresAt(now, { amount, unit });
 
     console.log("[INVITES] validity/expiresAt:", { amount, unit, expiresAt: expiresAt.toISOString() });
 
@@ -101,20 +100,18 @@ export async function POST(req: Request) {
     const tokenHash = hashToken(token);
 
     console.log("[INVITES_CREATE] token:", token);
-console.log("[INVITES_CREATE] tokenHash:", tokenHash);
-
+    console.log("[INVITES_CREATE] tokenHash:", tokenHash);
 
     const invite = await db.invite.create({
-  data: {
-    tenantId,
-    email,
-    role: role as any,
-    tokenHash,
-    expiresAt,
-  },
-  select: { id: true, createdAt: true, expiresAt: true },
-});
-
+      data: {
+        tenantId,
+        email,
+        role: role as any,
+        tokenHash,
+        expiresAt,
+      },
+      select: { id: true, createdAt: true, expiresAt: true },
+    });
 
     console.log("[INVITES] invite created:", invite.id);
 
@@ -125,11 +122,12 @@ console.log("[INVITES_CREATE] tokenHash:", tokenHash);
     let emailed = false;
     let emailError: string | null = null;
 
-    const tenant = await db.tenant.findUnique({
-  where: { id: tenantId },
-  select: { name: true, code: true },
-});
-
+    // ✅ email block try/catch (only for email)
+    try {
+      const tenant = await db.tenant.findUnique({
+        where: { id: tenantId },
+        select: { name: true, code: true },
+      });
 
       console.log("[INVITES] SENDING_EMAIL", {
         to: email,
@@ -139,19 +137,18 @@ console.log("[INVITES_CREATE] tokenHash:", tokenHash);
         hasResendKey: !!process.env.RESEND_API_KEY,
       });
 
-     await sendInviteEmail({
-  to: email,
-  inviteUrl,
-  tenantName: tenant?.name ?? "GHG App",
-  tenantCode: tenant?.code ?? undefined,
-  role,
-  productName: "IFlowX",
-  licenseStart: invite.createdAt,
-  licenseEnd: invite.expiresAt,
-  issuedTo: email,
-  issuedBy: "GHG App Admin",
-});
-
+      await sendInviteEmail({
+        to: email,
+        inviteUrl,
+        tenantName: tenant?.name ?? "GHG App",
+        tenantCode: tenant?.code ?? undefined,
+        role,
+        productName: "IFlowX",
+        licenseStart: invite.createdAt,
+        licenseEnd: invite.expiresAt,
+        issuedTo: email,
+        issuedBy: "GHG App Admin",
+      });
 
       emailed = true;
       console.log("[INVITES] EMAIL_SENT_OK");
@@ -164,7 +161,6 @@ console.log("[INVITES_CREATE] tokenHash:", tokenHash);
       ok: true,
       inviteUrl,
       expiresAt,
-      validity: { amount, unit },
       emailed,
       emailError,
     });
