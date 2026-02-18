@@ -4,10 +4,10 @@ import { redirect } from "next/navigation";
 import LoginClient from "./LoginClient";
 
 export default async function LoginPage() {
-  const session = await getServerSession(authOptions);
+  const session = await getServerSession(authOptions as any);
 
-  // već ulogovan → vodi na glavnu (dashboard u app/page.tsx)
-  if (session) redirect("/");
+  // redirect samo ako ima user email (realno ulogovan)
+  if ((session as any)?.user?.email) redirect("/");
 
   return <LoginClient />;
 }

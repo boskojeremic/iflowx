@@ -15,12 +15,11 @@ export default function LoginClient() {
     setLoading(true);
 
     const r = await signIn("credentials", {
-        email: email.trim().toLowerCase(),
-        password,
-        redirect: true,
-        callbackUrl: "/",  // ✅ uvek vodi na dashboard (app/page.tsx)
-      });
-      
+      email: email.trim().toLowerCase(),
+      password,
+      redirect: false,
+      callbackUrl: "/",
+    });
 
     setLoading(false);
 
@@ -29,8 +28,8 @@ export default function LoginClient() {
       return;
     }
 
-    // ✅ success → dashboard je na "/"
-    window.location.href = "/";
+    // ✅ uspeh → ručni redirect
+    window.location.href = r.url ?? "/";
   }
 
   return (

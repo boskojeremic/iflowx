@@ -1,7 +1,8 @@
-"use client"
+"use client";
 
-import * as React from "react"
-import Link from "next/link"
+import * as React from "react";
+import Link from "next/link";
+import LogoutButton from "@/components/LogoutButton";
 
 import {
   Sidebar,
@@ -14,7 +15,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from "@/components/ui/sidebar"
+} from "@/components/ui/sidebar";
 
 const nav = [
   { title: "Dashboard", href: "/" },
@@ -22,7 +23,7 @@ const nav = [
   { title: "Activity", href: "/activity" },
   { title: "Reports", href: "/reports" },
   { title: "Settings", href: "/settings" },
-]
+];
 
 export default function AppSidebar() {
   return (
@@ -49,9 +50,10 @@ export default function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="px-3 py-3">
+      <SidebarFooter className="px-3 py-3 space-y-2">
+        <LogoutButton />
         <div className="text-xs opacity-70">DigitalOps Consulting</div>
       </SidebarFooter>
     </Sidebar>
-  )
+  );
 }
