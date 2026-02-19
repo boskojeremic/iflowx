@@ -1,7 +1,7 @@
-import { prisma } from "@/lib/prisma";
+import { db } from "./db";
 
 export async function checkUserLicense(email: string) {
-  const result = await prisma.$queryRawUnsafe(`
+  const result = await db.$queryRawUnsafe(`
     SELECT
       LEAST(t."licenseEndsAt", m."accessEndsAt") AS "effectiveEndsAt",
       CASE
