@@ -1,28 +1,34 @@
 import { NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
-import { checkUserLicense } from "@/lib/license";
 
 export async function middleware(req: any) {
+  const { pathname } = req.nextUrl;
+
+  // Public rute (ne diramo)
+  const isPublic =
+    pathname === "/login" ||
+    pathname.startsWith("/api/auth") ||
+    pathname.startsWith("/_next") ||
+    pathname === "/favicon.ico" ||
+    pathname.startsWith("/public");
+
+  if (isPublic) return NextResponse.next();
+
   const token = await getToken({ req });
 
+  // Ako nije ulogovan → uvek na /login
   if (!token?.email) {
-    return NextResponse.next();
+    const url = req.nextUrl.clone();
+    url.pathname = "/login";
+    // opcionalno: vrati ga posle login-a tamo gde je krenuo
+    url.searchParams.set("callbackUrl", req.nextUrl.pathname);
+    return NextResponse.redirect(url);
   }
 
-  // dozvoli license page
-  if (req.nextUrl.pathname.startsWith("/license-expired")) {
-    return NextResponse.next();
-  }
-
-  const license = await checkUserLicense(token.email);
-
-  if (!license || license.licenseState !== "ACTIVE") {
-    return NextResponse.redirect(new URL("/license-expired", req.url));
-  }
-
+  // Ulogovan → pusti dalje (license check ćemo kasnije server-side)
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: ["/app/:path*"], // samo app deo
+  matcher: ["/((?!.*\\.).*)"], // sve rute osim fajlova sa ekstenzijom
 };

@@ -30,9 +30,11 @@ export default function LoginClient() {
       return;
     }
 
-    // ručni redirect
-    window.location.href = res.url ?? "/";
-  }
+    if (res?.url) {
+  window.location.assign(res.url);
+} else {
+  window.location.assign("/");
+}
 
   return (
     <div className="min-h-screen flex items-center justify-center">
