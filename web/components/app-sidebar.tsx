@@ -2,12 +2,10 @@
 
 import * as React from "react";
 import Link from "next/link";
-import LogoutButton from "@/components/LogoutButton";
 
 import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
@@ -49,11 +47,6 @@ export default function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-
-      <SidebarFooter className="px-3 py-3 space-y-2">
-        <LogoutButton />
-        <div className="text-xs opacity-70">DigitalOps Consulting</div>
-      </SidebarFooter>
     </Sidebar>
   );
 }

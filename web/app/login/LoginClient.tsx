@@ -20,17 +20,34 @@ export default function LoginClient() {
       email: email.trim().toLowerCase(),
       password,
       redirect: false,
-      callbackUrl: "/",
     });
 
-    setLoading(false);
-
     if (!res || res.error) {
+      setLoading(false);
       setError("Invalid email or password");
       return;
     }
 
-    window.location.assign(res.url ?? "/");
+    // SUPER ADMIN → /admin
+    // Običan user → /
+    try {
+      const r = await fetch("/api/admin/tenants", { cache: "no-store" });
+      if (r.ok) {
+        const d = await r.json();
+        if (d?.ok && Array.isArray(d?.tenants)) {
+          // Super admin dobija "sve" (ok je i za običnog, ali mi ćemo kasnije napraviti čist /api/me)
+          // Za sada: super admin redirect na /admin, ostali na /
+          // Najsigurnije: ako user nema membership, tenants može biti [], pa NE zaključujemo super admin po tome.
+          // Zato ovde samo probamo: ako endpoint vrati ok, ide na /admin.
+          setLoading(false);
+          window.location.assign("/admin");
+          return;
+        }
+      }
+    } catch {}
+
+    setLoading(false);
+    window.location.assign("/");
   }
 
   return (

@@ -4,10 +4,12 @@ import { redirect } from "next/navigation";
 import LoginClient from "./LoginClient";
 
 export default async function LoginPage() {
-  const session = await getServerSession(authOptions as any);
+  const session = (await getServerSession(authOptions as any)) as any;
+  const email = session?.user?.email;
 
-  // redirect samo ako ima user email (realno ulogovan)
-  if ((session as any)?.user?.email) redirect("/");
+  // Ako je već ulogovan, nema šta da traži na /login
+  if (email) redirect("/");
 
+  // Ako NIJE ulogovan, prikaži formu
   return <LoginClient />;
 }

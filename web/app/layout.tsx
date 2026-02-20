@@ -37,7 +37,25 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 </div>
               </div>
 
-              <div className="text-xs text-white/60">Pilot</div>
+              <div className="flex items-center gap-3 text-xs">
+  <a
+    href="/admin"
+    className="px-3 py-1 border border-white/20 rounded hover:bg-white/10 text-white/80"
+  >
+    Licensor
+  </a>
+
+  <a
+    href="/app"
+    className="px-3 py-1 border border-white/20 rounded hover:bg-white/10 text-white/80"
+  >
+    App
+  </a>
+
+  <LogoutButton />
+
+  <div className="text-white/60">Pilot</div>
+</div>
             </header>
 
             <main className="min-h-[calc(100vh-3.5rem)] p-6">{children}</main>

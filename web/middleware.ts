@@ -4,31 +4,31 @@ import { getToken } from "next-auth/jwt";
 export async function middleware(req: any) {
   const { pathname } = req.nextUrl;
 
-  // Public rute (ne diramo)
-  const isPublic =
-    pathname === "/login" ||
+  // ✅ uvek pusti login i nextauth rute (sprečava loop)
+  if (
+    pathname.startsWith("/login") ||
     pathname.startsWith("/api/auth") ||
     pathname.startsWith("/_next") ||
     pathname === "/favicon.ico" ||
-    pathname.startsWith("/public");
+    pathname.startsWith("/public")
+  ) {
+    return NextResponse.next();
+  }
 
-  if (isPublic) return NextResponse.next();
+  const token = await getToken({
+    req,
+    secret: process.env.NEXTAUTH_SECRET ?? process.env.AUTH_SECRET,
+  });
 
-  const token = await getToken({ req });
-
-  // Ako nije ulogovan → uvek na /login
   if (!token?.email) {
     const url = req.nextUrl.clone();
     url.pathname = "/login";
-    // opcionalno: vrati ga posle login-a tamo gde je krenuo
-    url.searchParams.set("callbackUrl", req.nextUrl.pathname);
     return NextResponse.redirect(url);
   }
 
-  // Ulogovan → pusti dalje (license check ćemo kasnije server-side)
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: ["/((?!.*\\.).*)"], // sve rute osim fajlova sa ekstenzijom
+  matcher: ["/((?!.*\\.).*)"],
 };
