@@ -160,3 +160,46 @@ export async function PATCH(req: Request) {
 
   return NextResponse.json({ ok: true, tenant: updated });
 }
+export async function DELETE(req: Request) {
+  const me = await getCurrentUser();
+  if (!me) return NextResponse.json({ ok: false, error: "UNAUTH" }, { status: 401 });
+  if (!me.isSuperAdmin) return NextResponse.json({ ok: false, error: "FORBIDDEN" }, { status: 403 });
+
+  const url = new URL(req.url);
+  const tenantId = String(url.searchParams.get("tenantId") ?? "").trim();
+  if (!tenantId) return NextResponse.json({ ok: false, error: "TENANT_ID_REQUIRED" }, { status: 400 });
+
+  try {
+    await db.$transaction(async (tx) => {
+      // 1) readings -> points
+      await tx.measurementReading.deleteMany({ where: { tenantId } });
+      await tx.measurementPoint.deleteMany({ where: { tenantId } });
+
+      // 2) api keys
+      await tx.apiKey.deleteMany({ where: { tenantId } });
+
+      // 3) results/inputs
+      await tx.emissionResult.deleteMany({ where: { tenantId } });
+      await tx.gHGInput.deleteMany({ where: { tenantId } });
+
+      // 4) emitters/assets/periods
+      await tx.emitter.deleteMany({ where: { tenantId } });
+      await tx.asset.deleteMany({ where: { tenantId } });
+      await tx.reportingPeriod.deleteMany({ where: { tenantId } });
+
+      // 5) invites/memberships
+      await tx.invite.deleteMany({ where: { tenantId } });
+      await tx.membership.deleteMany({ where: { tenantId } });
+
+      // 6) tenant
+      await tx.tenant.delete({ where: { id: tenantId } });
+    });
+
+    return NextResponse.json({ ok: true });
+  } catch (e: any) {
+    return NextResponse.json(
+      { ok: false, error: e?.message ?? "DELETE_FAILED" },
+      { status: 500 }
+    );
+  }
+}
