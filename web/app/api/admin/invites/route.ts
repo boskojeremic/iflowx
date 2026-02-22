@@ -127,7 +127,7 @@ const inviteUrl = `${baseUrl}/invite/${token}`;
       const tenant = await db.tenant.findUnique({
         where: { id: tenantId },
         select: { name: true, code: true },
-      });pnpm build
+      });
 
       console.log("[INVITES] SENDING_EMAIL", {
         to: email,
