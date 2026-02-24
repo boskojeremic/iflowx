@@ -19,7 +19,7 @@ export function AppShell({
   showSuperAdmin: boolean;
   superAdminHref: string;
 }) {
-  const pathname = usePathname();
+  const pathname = usePathname() ?? "";
 
   return (
     <div className="min-h-screen text-white">

@@ -17,7 +17,7 @@ type TabKey = (typeof tabs)[number]["key"];
 
 export default function CoreAdminClient() {
   const sp = useSearchParams();
-  const tab = (sp.get("tab") as TabKey) ?? "industry";
+const tab = ((sp?.get("tab") as TabKey | null) ?? "industry");
 
   return (
     <div className="max-w-5xl mx-auto">

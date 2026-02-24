@@ -149,7 +149,7 @@ export async function POST(req: Request) {
     console.log("[INVITES] invite created:", invite.id);
 
     // ✅ Use dynamic base URL (no hardcode)
-    const baseUrl = await getBaseUrl(req);
+    const baseUrl = getBaseUrl();
 const inviteUrl = `${baseUrl}/invite/${token}`;
 console.log("[INVITES] baseUrl/inviteUrl:", { baseUrl, inviteUrl });
     

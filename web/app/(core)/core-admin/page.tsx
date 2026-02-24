@@ -17,7 +17,7 @@ type TabKey = (typeof tabs)[number]["key"];
 
 export default function CoreAdminPage() {
   const sp = useSearchParams();
-  const tab = (sp.get("tab") as TabKey) ?? "industry";
+const tab = ((sp?.get("tab") as TabKey | null) ?? "industry");
 
   return (
   <div className="mx-auto w-full max-w-5xl px-6 py-8">
