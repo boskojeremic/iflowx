@@ -4,20 +4,20 @@ import { cookies } from "next/headers";
 export const runtime = "nodejs";
 
 export async function POST() {
-  const c = await cookies();
+  const cookieStore = await cookies();
 
-  // session token (dev + prod)
-  c.delete("next-auth.session-token");
-  c.delete("__Secure-next-auth.session-token");
+  // SESSION (DEV + PROD)
+  cookieStore.delete("next-auth.session-token");
+  cookieStore.delete("__Secure-next-auth.session-token");
 
-  // csrf (dev + prod)
-  c.delete("next-auth.csrf-token");
-  c.delete("__Host-next-auth.csrf-token");
-  c.delete("__Secure-next-auth.csrf-token");
+  // CSRF
+  cookieStore.delete("next-auth.csrf-token");
+  cookieStore.delete("__Host-next-auth.csrf-token");
+  cookieStore.delete("__Secure-next-auth.csrf-token");
 
-  // callback url (dev + prod)
-  c.delete("next-auth.callback-url");
-  c.delete("__Secure-next-auth.callback-url");
+  // CALLBACK URL
+  cookieStore.delete("next-auth.callback-url");
+  cookieStore.delete("__Secure-next-auth.callback-url");
 
   return NextResponse.json({ ok: true });
 }
