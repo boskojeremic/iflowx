@@ -1,32 +1,23 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 
+export const runtime = "nodejs";
+
 export async function POST() {
-  const cookieStore = await cookies();
+  const c = await cookies();
 
-  const names = [
-    // session
-    "next-auth.session-token",
-    "__Secure-next-auth.session-token",
-    "__Host-next-auth.session-token",
+  // session token (dev + prod)
+  c.delete("next-auth.session-token");
+  c.delete("__Secure-next-auth.session-token");
 
-    // csrf (nije obavezno, ali čisti sve)
-    "next-auth.csrf-token",
-    "__Secure-next-auth.csrf-token",
-    "__Host-next-auth.csrf-token",
+  // csrf (dev + prod)
+  c.delete("next-auth.csrf-token");
+  c.delete("__Host-next-auth.csrf-token");
+  c.delete("__Secure-next-auth.csrf-token");
 
-    // callback
-    "next-auth.callback-url",
-    "__Secure-next-auth.callback-url",
-    "__Host-next-auth.callback-url",
-  ];
-
-  for (const name of names) {
-    cookieStore.set(name, "", {
-      path: "/",
-      expires: new Date(0),
-    });
-  }
+  // callback url (dev + prod)
+  c.delete("next-auth.callback-url");
+  c.delete("__Secure-next-auth.callback-url");
 
   return NextResponse.json({ ok: true });
 }
