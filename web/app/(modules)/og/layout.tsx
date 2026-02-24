@@ -1,49 +1,72 @@
+// app/(modules)/og/layout.tsx  (SERVER component)
 import Link from "next/link";
+import { getCurrentUser } from "@/lib/authz";
+import { db } from "@/lib/db";
+import { getPortalNavForTenant } from "@/lib/portal-nav";
 
-const OG_NAV = [
-  { code: "OG-OPS", href: "/og/ops", label: "Field Operations" },
-  { code: "OG-WELL", href: "/og/wells", label: "Well Production" },
-  { code: "OG-GHG", href: "/og/ghg", label: "GHG MRV" },
-  { code: "OG-CEMS", href: "/og/cems-qaqc", label: "CEMS QA/QC" },
-  { code: "OG-ASSET", href: "/og/assets", label: "Asset Register" },
-  { code: "OG-HSE", href: "/og/hse", label: "HSE (Incidents & CAPA)" },
-  { code: "OG-SCM", href: "/og/scm", label: "Procurement & Logistics" },
-];
+export default async function OGLayout({ children }: { children: React.ReactNode }) {
+  const me = await getCurrentUser();
+  if (!me) return <div className="p-6 text-white">UNAUTH</div>;
 
-export default function OGLayout({ children }: { children: React.ReactNode }) {
+  // Nađi tenantId iz membership-a (ako već imaš "activeTenantId" logiku, koristi nju)
+  // Ovde uzimam prvi ACTIVE membership kao primer:
+  const membership = await db.membership.findFirst({
+    where: { userId: me.id, status: "ACTIVE" },
+    select: { tenantId: true },
+  });
+
+  if (!membership) {
+    return <div className="p-6 text-white">No tenant membership</div>;
+  }
+
+  const nav = await getPortalNavForTenant(membership.tenantId);
+
   return (
-    <div style={{ display: "flex", minHeight: "100vh" }}>
-      <aside
-        style={{
-          width: 280,
-          borderRight: "1px solid rgba(255,255,255,0.08)",
-          padding: 16,
-        }}
-      >
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ fontWeight: 700 }}>Oil &amp; Gas Portal</div>
-          <div style={{ opacity: 0.7, fontSize: 12 }}>IFlowX Suite</div>
-        </div>
-
-        <nav style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {OG_NAV.map((item) => (
+    <div className="min-h-screen flex text-white">
+      <aside className="w-[280px] border-r border-white/10 p-4">
+        {/* Super Admin button hard-coded */}
+        {me.isSuperAdmin && (
+          <div className="mb-4">
             <Link
-              key={item.code}
-              href={item.href}
-              style={{
-                padding: "10px 12px",
-                borderRadius: 10,
-                textDecoration: "none",
-                border: "1px solid rgba(255,255,255,0.10)",
-              }}
+              href="/core-admin/tenant-control"
+              className="block rounded px-3 py-2 bg-white/10 border border-white/15 hover:bg-white/15"
             >
-              {item.label}
+              Core Admin
             </Link>
+          </div>
+        )}
+
+        {/* DB-driven modules */}
+        <div className="space-y-4">
+          {nav.map((p) => (
+            <div key={p.platformCode}>
+              <div className="text-sm font-semibold text-white/80 mb-2">
+                {p.platformName}
+              </div>
+
+              <div className="flex flex-col gap-2">
+                {p.modules.map((m) => (
+                  <Link
+                    key={m.code}
+                    href={m.routePath}
+                    className="block rounded px-3 py-2 bg-white/5 border border-white/10 hover:bg-white/10"
+                  >
+                    {m.name}
+                  </Link>
+                ))}
+              </div>
+            </div>
           ))}
-        </nav>
+
+          {nav.length === 0 && (
+            <div className="text-xs text-white/50">
+              No modules assigned to this tenant yet.
+            </div>
+          )}
+        </div>
       </aside>
 
-      <main style={{ flex: 1, padding: 24 }}>{children}</main>
+      <main className="flex-1 p-6">{children}</main>
     </div>
   );
 }

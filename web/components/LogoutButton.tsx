@@ -1,17 +1,46 @@
 "use client";
 
-import { signOut } from "next-auth/react";
+import * as React from "react";
+import { useRouter } from "next/navigation";
 
-export default function LogoutButton({ className = "" }: { className?: string }) {
+export default function LogoutButton({
+  className,
+  children,
+}: {
+  className?: string;
+  children?: React.ReactNode;
+}) {
+  const router = useRouter();
+  const [loading, setLoading] = React.useState(false);
+
+  async function onLogout() {
+    try {
+      setLoading(true);
+
+      // ⬇️ OVDE stavi TAČAN endpoint koji si koristio i ranije.
+      // Najčešće je jedan od ovih:
+      // await fetch("/api/auth/logout", { method: "POST" });
+      // await fetch("/api/logout", { method: "POST" });
+      // await fetch("/api/auth/signout", { method: "POST" });
+
+      await fetch("/api/auth/logout", {
+  method: "POST",
+  credentials: "include",
+});
+window.location.href = "/login";
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <button
-      onClick={() => signOut({ callbackUrl: "/login" })}
-      className={
-        className ||
-        "px-3 py-1 border border-white/20 rounded hover:bg-white/10 text-white/80"
-      }
+      type="button"
+      onClick={onLogout}
+      disabled={loading}
+      className={className}
     >
-      Logout
+      {children ?? (loading ? "Logging out…" : "Logout")}
     </button>
   );
 }

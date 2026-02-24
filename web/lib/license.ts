@@ -33,3 +33,13 @@ export async function checkUserLicense(email: string) {
 
   return result[0] ?? null;
 }
+
+export function isActiveInPeriod(
+  startsAt: Date | null,
+  endsAt: Date | null,
+  now = new Date()
+) {
+  if (startsAt && startsAt > now) return false;
+  if (endsAt && endsAt < now) return false;
+  return true;
+}
