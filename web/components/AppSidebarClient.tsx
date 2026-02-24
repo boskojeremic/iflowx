@@ -136,6 +136,7 @@ export default function AppSidebarClient({
                         await fetch("/api/auth/logout", {
                           method: "POST",
                           credentials: "include",
+                          cache: "no-store",
                         });
 
                         // bitno za prod: replace, ne href

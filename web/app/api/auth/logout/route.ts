@@ -1,23 +1,37 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
 
 export const runtime = "nodejs";
 
-export async function POST() {
-  const cookieStore = await cookies();
+function killCookie(res: NextResponse, name: string) {
+  // maxAge: 0 + expires u prošlosti + path "/"
+  res.cookies.set({
+    name,
+    value: "",
+    path: "/",
+    maxAge: 0,
+    expires: new Date(0),
+    // secure/sameSite se ne moraju poklopiti 1:1 za brisanje,
+    // ali ne smeta da ih ostavimo “sigurno”
+    secure: true,
+    sameSite: "lax",
+  });
+}
 
-  // SESSION (DEV + PROD)
-  cookieStore.delete("next-auth.session-token");
-  cookieStore.delete("__Secure-next-auth.session-token");
+export async function POST() {
+  const res = NextResponse.json({ ok: true });
+
+  // SESSION (prod + dev)
+  killCookie(res, "__Secure-next-auth.session-token");
+  killCookie(res, "next-auth.session-token");
 
   // CSRF
-  cookieStore.delete("next-auth.csrf-token");
-  cookieStore.delete("__Host-next-auth.csrf-token");
-  cookieStore.delete("__Secure-next-auth.csrf-token");
+  killCookie(res, "__Host-next-auth.csrf-token");
+  killCookie(res, "__Secure-next-auth.csrf-token");
+  killCookie(res, "next-auth.csrf-token");
 
-  // CALLBACK URL
-  cookieStore.delete("next-auth.callback-url");
-  cookieStore.delete("__Secure-next-auth.callback-url");
+  // CALLBACK
+  killCookie(res, "__Secure-next-auth.callback-url");
+  killCookie(res, "next-auth.callback-url");
 
-  return NextResponse.json({ ok: true });
+  return res;
 }
