@@ -1,9 +1,21 @@
 "use client";
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import * as React from "react";
 import Link from "next/link";
 import { Home, LogOut, Settings } from "lucide-react";
 import { signOut } from "next-auth/react";
+import LogOutConfirm from "@/components/LogOutConfirm";
 
 import {
   SidebarProvider,
@@ -112,25 +124,43 @@ export default function AppSidebarClient({
           ))}
         </SidebarContent>
 
-        {/* LOGOUT */}
-        <SidebarFooter className="px-3 pb-3">
+          {/* LOGOUT */}
+<SidebarFooter className="px-3 pb-3">
   <SidebarMenu>
     <SidebarMenuItem>
-      <SidebarMenuButton
-        className="w-full justify-start cursor-pointer"
-        onClick={() => {
-          const confirmed = window.confirm(
-            "Are you sure you want to log out of the application?"
-          );
+      <AlertDialog>
+        <AlertDialogTrigger asChild>
+          <SidebarMenuButton className="w-full justify-start cursor-pointer">
+            <LogOut className="mr-2 h-4 w-4" />
+            Logout
+          </SidebarMenuButton>
+        </AlertDialogTrigger>
 
-          if (confirmed) {
-            signOut({ callbackUrl: "/login" });
-          }
-        }}
-      >
-        <LogOut className="mr-2 h-4 w-4" />
-        Logout
-      </SidebarMenuButton>
+        <AlertDialogContent className="bg-[#0b0f0d] border border-white/15 text-white shadow-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Log out?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to log out of the application?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-green-600 hover:bg-green-700 text-white"
+              onClick={async () => {
+                await fetch("/api/auth/logout", {
+                  method: "POST",
+                  credentials: "include",
+                });
+                window.location.href = "/login";
+              }}
+            >
+              Logout
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </SidebarMenuItem>
   </SidebarMenu>
 </SidebarFooter>
