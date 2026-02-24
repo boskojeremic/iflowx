@@ -1,22 +1,31 @@
-// app/api/auth/logout/route.ts
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 
 export async function POST() {
   const cookieStore = await cookies();
 
-  // Ako ti NextAuth koristi ove cookies, obriši ih:
-  // (ne smeta i ako neki ne postoje)
   const names = [
-    "__Secure-next-auth.session-token",
+    // session
     "next-auth.session-token",
-    "__Host-next-auth.csrf-token",
+    "__Secure-next-auth.session-token",
+    "__Host-next-auth.session-token",
+
+    // csrf (nije obavezno, ali čisti sve)
     "next-auth.csrf-token",
+    "__Secure-next-auth.csrf-token",
+    "__Host-next-auth.csrf-token",
+
+    // callback
     "next-auth.callback-url",
+    "__Secure-next-auth.callback-url",
+    "__Host-next-auth.callback-url",
   ];
 
   for (const name of names) {
-    cookieStore.set(name, "", { path: "/", expires: new Date(0) });
+    cookieStore.set(name, "", {
+      path: "/",
+      expires: new Date(0),
+    });
   }
 
   return NextResponse.json({ ok: true });

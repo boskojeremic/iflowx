@@ -15,14 +15,12 @@ import {
 
 export default function LogOutConfirm({
   title = "Log out?",
-  description = "You will be logged out of the application.",
+  description = "Are you sure you want to log out of the application?",
   trigger,
-  onConfirm,
 }: {
   title?: string;
   description?: string;
   trigger: React.ReactNode;
-  onConfirm: () => void | Promise<void>;
 }) {
   const [open, setOpen] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
@@ -30,10 +28,19 @@ export default function LogOutConfirm({
   async function handleConfirm() {
     try {
       setLoading(true);
-      await onConfirm();
-      setOpen(false);
+
+      // 1) server logout (mora da obriše cookie na prod)
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        credentials: "include",
+      });
+
+      // 2) bitno: REPLACE, ne href/push
+      // (da ne ostane u history i da ne “vrati” nazad)
+      window.location.replace("/login");
     } finally {
       setLoading(false);
+      setOpen(false);
     }
   }
 
@@ -49,6 +56,7 @@ export default function LogOutConfirm({
 
         <AlertDialogFooter>
           <AlertDialogCancel disabled={loading}>Cancel</AlertDialogCancel>
+
           <AlertDialogAction onClick={handleConfirm} disabled={loading}>
             {loading ? "Logging out..." : "Logout"}
           </AlertDialogAction>
