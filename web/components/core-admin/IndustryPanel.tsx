@@ -3,19 +3,30 @@
 import { useEffect, useState } from "react";
 import DeleteConfirm from "@/components/DeleteConfirm";
 import { toast } from "sonner";
+import {
+  AdminPrimaryButton,
+  AdminRowButton,
+} from "@/components/core-admin/AdminButtons";
 
 type Industry = {
   id: string;
   name: string;
   code: string;
+  sortOrder: number;
 };
 
 export default function IndustryPanel() {
   const [industries, setIndustries] = useState<Industry[]>([]);
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
+  const [sortOrder, setSortOrder] = useState<string>("100");
+
   const [editingId, setEditingId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  const isEditMode = !!editingId;
+
+  const upper = (v: unknown) => String(v ?? "").toUpperCase();
 
   async function load() {
     const res = await fetch("/api/industries", { cache: "no-store" });
@@ -29,14 +40,16 @@ export default function IndustryPanel() {
 
   function startEdit(ind: Industry) {
     setEditingId(ind.id);
-    setName(ind.name);
-    setCode(ind.code);
+    setName(upper(ind.name));
+    setCode(upper(ind.code));
+    setSortOrder(String(ind.sortOrder ?? 100));
   }
 
   function cancelEdit() {
     setEditingId(null);
     setName("");
     setCode("");
+    setSortOrder("100");
   }
 
   async function handleAdd() {
@@ -52,15 +65,18 @@ export default function IndustryPanel() {
       const res = await fetch("/api/industries", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim(), code: code.trim() }),
+        body: JSON.stringify({
+          name: upper(name).trim(),
+          code: upper(code).trim(),
+          sortOrder: Number(sortOrder) || 0,
+        }),
       });
 
       if (res.ok) {
         toast.success("Industry created", {
-          description: `"${name.trim()}" has been successfully created.`,
+          description: `"${upper(name).trim()}" has been created.`,
         });
-        setName("");
-        setCode("");
+        cancelEdit();
         await load();
       } else {
         const err = await res.json().catch(() => ({}));
@@ -74,15 +90,15 @@ export default function IndustryPanel() {
   }
 
   async function handleUpdate() {
-    // KLJUČ: “zaključaj” id u lokalnu promenljivu da ne ode na null usred poziva
     const id = editingId;
 
     if (!id) {
-      toast.error("Update failed", { description: "Missing id (no row selected)." });
+      toast.error("Update failed", { description: "Missing id." });
       return;
     }
+
     if (!name.trim() || !code.trim()) {
-      toast("Missing fields", {
+      toast.error("Missing fields", {
         description: "Industry name and code are required.",
       });
       return;
@@ -93,12 +109,16 @@ export default function IndustryPanel() {
       const res = await fetch(`/api/industries/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim(), code: code.trim() }),
+        body: JSON.stringify({
+          name: upper(name).trim(),
+          code: upper(code).trim(),
+          sortOrder: Number(sortOrder) || 0,
+        }),
       });
 
       if (res.ok) {
         toast.success("Industry updated", {
-          description: `"${name.trim()}" has been updated.`,
+          description: `"${upper(name).trim()}" has been updated.`,
         });
         cancelEdit();
         await load();
@@ -120,17 +140,14 @@ export default function IndustryPanel() {
 
       if (res.ok) {
         toast.error("Industry permanently deleted", {
-          description: `"${indName}" and all related data were permanently deleted.`,
+          description: `"${upper(indName)}" was deleted.`,
         });
-        // ako brišeš red koji je trenutno u edit modu
         if (editingId === id) cancelEdit();
         await load();
       } else {
         const err = await res.json().catch(() => ({}));
         toast.error("Delete failed", {
-          description:
-            err?.error ||
-            "Database rejected delete or relation constraint failed.",
+          description: err?.error || "Could not delete industry.",
         });
       }
     } finally {
@@ -138,57 +155,54 @@ export default function IndustryPanel() {
     }
   }
 
-  const isEditMode = !!editingId;
-
   return (
     <div className="space-y-4">
-      {/* ADD / EDIT FORM (GORE) */}
-      <div className="flex gap-2 items-center">
+      {/* FORM */}
+      <div className="flex gap-2 items-center flex-wrap">
         <input
           className="px-3 py-2 bg-black/40 border border-white/20 rounded-md w-[260px]"
           placeholder="Industry name"
           value={name}
-          onChange={(e) => setName(e.target.value)}
+          onChange={(e) => setName(upper(e.target.value))}
           disabled={busy}
         />
+
         <input
           className="px-3 py-2 bg-black/40 border border-white/20 rounded-md w-[140px]"
           placeholder="Code"
           value={code}
-          onChange={(e) => setCode(e.target.value)}
+          onChange={(e) => setCode(upper(e.target.value))}
           disabled={busy}
         />
 
-        <button
+        <input
+          className="px-3 py-2 bg-black/40 border border-white/20 rounded-md w-[90px]"
+          placeholder="Sort"
+          value={sortOrder}
+          onChange={(e) => setSortOrder(e.target.value)}
+          disabled={busy}
+        />
+
+        <AdminPrimaryButton
           onClick={() => (isEditMode ? handleUpdate() : handleAdd())}
           disabled={busy}
-          className={[
-            "px-4 py-2 rounded-md text-white cursor-pointer",
-            isEditMode
-              ? "bg-blue-600 hover:bg-blue-700"
-              : "bg-green-600 hover:bg-green-700",
-            busy ? "opacity-60 cursor-not-allowed" : "",
-          ].join(" ")}
+          variant={isEditMode ? "blue" : "green"}
         >
           {isEditMode ? "Save" : "Add"}
-        </button>
+        </AdminPrimaryButton>
 
         {isEditMode && (
-          <button
+          <AdminPrimaryButton
             onClick={cancelEdit}
             disabled={busy}
-            className={[
-              "px-4 py-2 rounded-md cursor-pointer",
-              "bg-white/10 hover:bg-white/15 border border-white/15 text-white",
-              busy ? "opacity-60 cursor-not-allowed" : "",
-            ].join(" ")}
+            variant="ghost"
           >
             Cancel
-          </button>
+          </AdminPrimaryButton>
         )}
       </div>
 
-      {/* LISTA SVIH REDOVA */}
+      {/* LIST */}
       <div className="space-y-2">
         {industries.map((ind) => (
           <div
@@ -197,36 +211,28 @@ export default function IndustryPanel() {
           >
             <div className="font-medium">
               {ind.name} ({ind.code})
+              <div className="text-xs opacity-70 mt-1">
+                sort {ind.sortOrder ?? 0}
+              </div>
             </div>
 
             <div className="flex gap-2">
-              <button
+              <AdminRowButton
                 onClick={() => startEdit(ind)}
                 disabled={busy}
-                className={[
-                  "px-3 py-1 rounded text-white text-sm cursor-pointer",
-                  "bg-blue-600 hover:bg-blue-700",
-                  busy ? "opacity-60 cursor-not-allowed" : "",
-                ].join(" ")}
+                variant="blue"
               >
                 Edit
-              </button>
+              </AdminRowButton>
 
               <DeleteConfirm
                 title="Delete Industry?"
-                description={`This will permanently delete "${ind.name}" and all related Platforms, Modules and Tenant mappings.`}
+                description={`This will permanently delete "${ind.name}" and all related data.`}
                 onConfirm={() => handleDelete(ind.id, ind.name)}
                 trigger={
-                  <button
-                    disabled={busy}
-                    className={[
-                      "px-3 py-1 rounded text-white text-sm cursor-pointer",
-                      "bg-red-600 hover:bg-red-700",
-                      busy ? "opacity-60 cursor-not-allowed" : "",
-                    ].join(" ")}
-                  >
+                  <AdminRowButton disabled={busy} variant="red">
                     Delete
-                  </button>
+                  </AdminRowButton>
                 }
               />
             </div>

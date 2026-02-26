@@ -8,28 +8,28 @@ datasource db {
 }
 
 model Tenant {
-  id              String               @id @default(cuid())
-  name            String
-  code            String               @unique
-  createdAt       DateTime             @default(now())
-  updatedAt       DateTime             @updatedAt
-  licenseStartsAt DateTime?            @db.Timestamp(6)
-  licenseEndsAt   DateTime?            @db.Timestamp(6)
-  seatLimit       Int                  @default(1)
-  apiKeys         ApiKey[]
-  assets          Asset[]
-  results         EmissionResult[]
-  emitters        Emitter[]
-  inputs          GHGInput[]
-  invites         Invite[]
-  points          MeasurementPoint[]
-  readings        MeasurementReading[]
-  members         Membership[]
-  periods         ReportingPeriod[]
-  tenantPlatforms TenantPlatform[]
-  tenantModules   TenantModule[]
+  id       String  @id @default(cuid())
+  name     String
+  code     String  @unique
+  isActive Boolean @default(true)
 
-  @@index([licenseEndsAt], map: "idx_tenant_license_end")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // ✅ inverse relations (OBAVEZNO zbog Prisma validation)
+  apiKeys          ApiKey[]
+  assets           Asset[]
+  results          EmissionResult[]
+  emitters         Emitter[]
+  inputs           GHGInput[]
+  invites          Invite[]
+  points           MeasurementPoint[]
+  readings         MeasurementReading[]
+  members          Membership[]
+  periods          ReportingPeriod[]
+
+  tenantModules    TenantModule[]
+  tenantIndustries TenantIndustry[]
 }
 
 model User {
@@ -349,52 +349,35 @@ model Industry {
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  platforms Platform[]
-}
-
-model Platform {
-  id         String   @id @default(cuid())
-  industryId String
-  code       String
-  name       String
-  isActive   Boolean  @default(true)
-  sortOrder  Int      @default(100)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  industry        Industry         @relation(fields: [industryId], references: [id], onDelete: Cascade)
-  modules         Module[]
-  tenantPlatforms TenantPlatform[]
-
-  @@unique([industryId, code])
-  @@index([industryId])
+  sortOrder Int      @default(100)
+  modules   Module[]
+  tenantIndustries TenantIndustry[]
 }
 
 model Module {
   id          String   @id @default(cuid())
-  platformId  String
+  industryId  String
   code        String
   name        String
   description String?
-  routePath   String? // npr "/og/ghg"
+  routePath   String?
   isAddon     Boolean  @default(true)
   isActive    Boolean  @default(true)
   sortOrder   Int      @default(100)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  platform      Platform       @relation(fields: [platformId], references: [id], onDelete: Cascade)
+  industry      Industry       @relation(fields: [industryId], references: [id], onDelete: Cascade)
   tenantModules TenantModule[]
 
-  @@unique([platformId, code])
-  @@index([platformId])
+  @@unique([industryId, code])
+  @@index([industryId])
 }
 
-model TenantPlatform {
+model TenantIndustry {
   id         String    @id @default(cuid())
   tenantId   String
-  platformId String
+  industryId String
   status     String    @default("ACTIVE")
   startsAt   DateTime? @db.Timestamp(6)
   endsAt     DateTime? @db.Timestamp(6)
@@ -402,11 +385,11 @@ model TenantPlatform {
   updatedAt  DateTime  @updatedAt
 
   tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  platform Platform @relation(fields: [platformId], references: [id], onDelete: Cascade)
+  industry Industry @relation(fields: [industryId], references: [id], onDelete: Cascade)
 
-  @@unique([tenantId, platformId])
+  @@unique([tenantId, industryId])
   @@index([tenantId])
-  @@index([platformId])
+  @@index([industryId])
 }
 
 model TenantModule {
@@ -414,8 +397,11 @@ model TenantModule {
   tenantId  String
   moduleId  String
   status    TenantModuleStatus @default(ACTIVE)
+
+  seatLimit Int                @default(1)
   startsAt  DateTime?          @db.Timestamp(6)
   endsAt    DateTime?          @db.Timestamp(6)
+
   createdAt DateTime           @default(now())
   updatedAt DateTime           @updatedAt
 

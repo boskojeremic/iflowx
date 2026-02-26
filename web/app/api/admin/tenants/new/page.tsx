@@ -26,7 +26,7 @@ export default function NewTenantPage() {
 
       const d = JSON.parse(text);
       if (d.ok) {
-        router.push("/admin/tenants");
+        router.push("/core-admin/tenants");
       } else {
         alert(d.error || "FAILED");
       }

@@ -3,6 +3,9 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import IndustryPanel from "@/components/core-admin/IndustryPanel";
+import ModulesPanel from "@/components/core-admin/ModulesPanel";
+import LicensingPanel from "@/components/core-admin/LicensingPanel";
+import TenantsPanel from "@/components/core-admin/TenantsPanel";
 
 const tabs = [
   { key: "industry", label: "Industry" },
@@ -70,10 +73,10 @@ const tab = ((sp?.get("tab") as TabKey | null) ?? "industry");
 
         <div className="rounded-xl border border-white/10 bg-black/20 p-4">
           {tab === "industry" && <IndustryPanel />}
-          {tab === "modules" && <div>Modules form</div>}
-          {tab === "tenants" && <div>Tenants form</div>}
+          {tab === "modules" && <ModulesPanel />}
+          {tab === "tenants" && <TenantsPanel />}
           {tab === "tenant-control" && <div>Tenant Control form</div>}
-          {tab === "licensing" && <div>Licensing form</div>}
+          {tab === "licensing" && <LicensingPanel />}
           {tab === "users" && <div>Users form</div>}
         </div>
       </div>

@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 
 export async function GET() {
   const industries = await prisma.industry.findMany({
-    orderBy: { createdAt: "desc" },
+    orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
   });
 
   return NextResponse.json({ industries });
@@ -14,8 +14,9 @@ export async function POST(req: Request) {
 
   const industry = await prisma.industry.create({
     data: {
-      name: body.name,
-      code: body.code,
+      name: String(body.name).trim().toUpperCase(),
+      code: String(body.code).trim().toUpperCase(),
+      sortOrder: Number(body.sortOrder) || 100,
     },
   });
 

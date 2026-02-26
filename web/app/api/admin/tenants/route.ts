@@ -22,7 +22,7 @@ async function getCurrentUser() {
     select: { id: true, email: true, name: true, isSuperAdmin: true },
   });
 
-  return user; // null ili user iz DB
+  return user;
 }
 
 export async function GET() {
@@ -36,9 +36,6 @@ export async function GET() {
         id: true,
         name: true,
         code: true,
-        seatLimit: true,
-        licenseStartsAt: true,
-        licenseEndsAt: true,
         createdAt: true,
       },
       orderBy: { createdAt: "desc" },
@@ -55,9 +52,6 @@ export async function GET() {
           id: true,
           name: true,
           code: true,
-          seatLimit: true,
-          licenseStartsAt: true,
-          licenseEndsAt: true,
           createdAt: true,
         },
       },
@@ -78,27 +72,26 @@ export async function POST(req: Request) {
 
   const body = await req.json().catch(() => null);
 
-  const name = String(body?.name ?? "").trim();
+  const nameRaw = String(body?.name ?? "").trim();
   const codeRaw = String(body?.code ?? "").trim();
 
-  if (!name) return NextResponse.json({ ok: false, error: "NAME_REQUIRED" }, { status: 400 });
+  if (!nameRaw) return NextResponse.json({ ok: false, error: "NAME_REQUIRED" }, { status: 400 });
 
-  const code = slugCode(codeRaw || name);
+  const code = slugCode(codeRaw || nameRaw);
   if (!code) return NextResponse.json({ ok: false, error: "CODE_INVALID" }, { status: 400 });
 
-  const seatLimit = Number(body?.seatLimit ?? 1);
-  const licenseStartsAt = body?.licenseStartsAt ? new Date(body.licenseStartsAt) : new Date(); // default danas
-  const licenseEndsAt = body?.licenseEndsAt ? new Date(body.licenseEndsAt) : null;
+  const name = nameRaw.toUpperCase();
+
 
   const tenant = await db.tenant.create({
-    data: { name, code, seatLimit, licenseStartsAt, licenseEndsAt },
+    data: {
+      name,
+      code,
+    },
     select: {
       id: true,
       name: true,
       code: true,
-      seatLimit: true,
-      licenseStartsAt: true,
-      licenseEndsAt: true,
       createdAt: true,
     },
   });
@@ -123,43 +116,33 @@ export async function PATCH(req: Request) {
   const tenantId = String(body?.tenantId ?? "").trim();
   if (!tenantId) return NextResponse.json({ ok: false, error: "TENANT_ID_REQUIRED" }, { status: 400 });
 
-  const seatLimit =
-    body?.seatLimit === undefined || body?.seatLimit === null ? undefined : Number(body.seatLimit);
+  const name =
+    body?.name === undefined || body?.name === null ? undefined : String(body.name).trim().toUpperCase();
 
-  const licenseStartsAt =
-    body?.licenseStartsAt === undefined
-      ? undefined
-      : body.licenseStartsAt
-      ? new Date(body.licenseStartsAt)
-      : null;
+  const code =
+    body?.code === undefined || body?.code === null ? undefined : slugCode(String(body.code).trim());
 
-  const licenseEndsAt =
-    body?.licenseEndsAt === undefined
-      ? undefined
-      : body.licenseEndsAt
-      ? new Date(body.licenseEndsAt)
-      : null;
+  const isActive =
+    body?.isActive === undefined || body?.isActive === null ? undefined : Boolean(body.isActive);
 
   const updated = await db.tenant.update({
     where: { id: tenantId },
     data: {
-      ...(seatLimit !== undefined ? { seatLimit } : {}),
-      ...(licenseStartsAt !== undefined ? { licenseStartsAt } : {}),
-      ...(licenseEndsAt !== undefined ? { licenseEndsAt } : {}),
+      ...(name !== undefined ? { name } : {}),
+      ...(code !== undefined ? { code } : {}),
+      ...(isActive !== undefined ? { isActive } : {}),
     },
     select: {
       id: true,
       name: true,
       code: true,
-      seatLimit: true,
-      licenseStartsAt: true,
-      licenseEndsAt: true,
       createdAt: true,
     },
   });
 
   return NextResponse.json({ ok: true, tenant: updated });
 }
+
 export async function DELETE(req: Request) {
   const me = await getCurrentUser();
   if (!me) return NextResponse.json({ ok: false, error: "UNAUTH" }, { status: 401 });
@@ -171,27 +154,25 @@ export async function DELETE(req: Request) {
 
   try {
     await db.$transaction(async (tx) => {
-      // 1) readings -> points
       await tx.measurementReading.deleteMany({ where: { tenantId } });
       await tx.measurementPoint.deleteMany({ where: { tenantId } });
 
-      // 2) api keys
       await tx.apiKey.deleteMany({ where: { tenantId } });
 
-      // 3) results/inputs
       await tx.emissionResult.deleteMany({ where: { tenantId } });
       await tx.gHGInput.deleteMany({ where: { tenantId } });
 
-      // 4) emitters/assets/periods
       await tx.emitter.deleteMany({ where: { tenantId } });
       await tx.asset.deleteMany({ where: { tenantId } });
       await tx.reportingPeriod.deleteMany({ where: { tenantId } });
 
-      // 5) invites/memberships
       await tx.invite.deleteMany({ where: { tenantId } });
       await tx.membership.deleteMany({ where: { tenantId } });
 
-      // 6) tenant
+      // ✅ NOVO: očisti i tenant mappings ako ih već koristiš
+      await tx.tenantModule.deleteMany({ where: { tenantId } });
+      await tx.tenantIndustry.deleteMany({ where: { tenantId } });
+
       await tx.tenant.delete({ where: { id: tenantId } });
     });
 

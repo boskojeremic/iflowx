@@ -2,9 +2,9 @@
 import { db } from "@/lib/db";
 
 export type PortalNavItem = {
-  platformCode: string;
-  platformName: string;
-  platformSort: number;
+  industryCode: string;
+  industryName: string;
+  industrySort: number;
   modules: {
     code: string;
     name: string;
@@ -16,26 +16,20 @@ export type PortalNavItem = {
 export async function getPortalNavForTenant(tenantId: string) {
   const now = new Date();
 
-  // 1) TenantPlatforms (koje platforme tenant ima)
-  const tps = await db.tenantPlatform.findMany({
+  const tis = await db.tenantIndustry.findMany({
     where: {
       tenantId,
       status: "ACTIVE",
-      platform: { isActive: true },
+      industry: { isActive: true },
       OR: [{ startsAt: null }, { startsAt: { lte: now } }],
-      AND: [
-        {
-          OR: [{ endsAt: null }, { endsAt: { gte: now } }],
-        },
-      ],
+      AND: [{ OR: [{ endsAt: null }, { endsAt: { gte: now } }] }],
     },
     select: {
-      platform: {
+      industry: {
         select: {
           id: true,
           code: true,
           name: true,
-          sortOrder: true,
           modules: {
             where: { isActive: true },
             select: {
@@ -44,53 +38,39 @@ export async function getPortalNavForTenant(tenantId: string) {
               name: true,
               routePath: true,
               sortOrder: true,
-              isAddon: true,
             },
             orderBy: { sortOrder: "asc" },
           },
         },
       },
     },
-    orderBy: { platform: { sortOrder: "asc" } },
+    orderBy: { industry: { name: "asc" } },
   });
 
-  // 2) TenantModules (koje module tenant ima)
   const tenantMods = await db.tenantModule.findMany({
     where: {
       tenantId,
       status: "ACTIVE",
       OR: [{ startsAt: null }, { startsAt: { lte: now } }],
-      AND: [
-        {
-          OR: [{ endsAt: null }, { endsAt: { gte: now } }],
-        },
-      ],
+      AND: [{ OR: [{ endsAt: null }, { endsAt: { gte: now } }] }],
     },
     select: {
       moduleId: true,
-      module: {
-        select: {
-          id: true,
-          isActive: true,
-        },
-      },
+      module: { select: { id: true, isActive: true } },
     },
   });
 
   const allowedModuleIds = new Set(
-    tenantMods
-      .filter((x) => x.module?.isActive)
-      .map((x) => x.moduleId)
+    tenantMods.filter((x) => x.module?.isActive).map((x) => x.moduleId)
   );
 
-  // 3) Grupisanje po platformama + filtriranje dozvoljenih modula
-  const nav: PortalNavItem[] = tps
-    .map((tp) => {
-      const p = tp.platform;
+  const nav: PortalNavItem[] = tis
+    .map((ti) => {
+      const ind = ti.industry;
 
-      const modules = (p.modules ?? [])
-        .filter((m) => !!m.routePath) // mora route da bi bio prikazan
-        .filter((m) => allowedModuleIds.has(m.id)) // mora biti dodeljen tenant-u
+      const modules = (ind.modules ?? [])
+        .filter((m) => !!m.routePath)
+        .filter((m) => allowedModuleIds.has(m.id))
         .map((m) => ({
           code: m.code,
           name: m.name,
@@ -100,13 +80,13 @@ export async function getPortalNavForTenant(tenantId: string) {
         .sort((a, b) => a.sortOrder - b.sortOrder);
 
       return {
-        platformCode: p.code,
-        platformName: p.name,
-        platformSort: p.sortOrder ?? 100,
+        industryCode: ind.code,
+        industryName: ind.name,
+        industrySort: 100, // ako dodaš sortOrder u Industry, promenimo ovde
         modules,
       };
     })
-    .filter((p) => p.modules.length > 0);
+    .filter((x) => x.modules.length > 0);
 
   return nav;
 }

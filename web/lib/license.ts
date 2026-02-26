@@ -1,45 +1,45 @@
-import { db } from "./db";
-
-type LicenseRow = {
-  effectiveEndsAt: Date | null;
-  licenseState:
-    | "TENANT_NO_LICENSE"
-    | "TENANT_LICENSE_INACTIVE"
-    | "USER_NO_ACCESS"
-    | "USER_ACCESS_INACTIVE"
-    | "ACTIVE";
-};
+// lib/license.ts
+import { db } from "@/lib/db";
 
 export async function checkUserLicense(email: string) {
-  const result = await db.$queryRawUnsafe<LicenseRow[]>(
-    `
-    SELECT
-      LEAST(t."licenseEndsAt", m."accessEndsAt") AS "effectiveEndsAt",
-      CASE
-        WHEN t."licenseStartsAt" IS NULL OR t."licenseEndsAt" IS NULL THEN 'TENANT_NO_LICENSE'
-        WHEN NOW() < t."licenseStartsAt" OR NOW() > t."licenseEndsAt" THEN 'TENANT_LICENSE_INACTIVE'
-        WHEN m."accessStartsAt" IS NULL OR m."accessEndsAt" IS NULL THEN 'USER_NO_ACCESS'
-        WHEN NOW() < m."accessStartsAt" OR NOW() > m."accessEndsAt" THEN 'USER_ACCESS_INACTIVE'
-        ELSE 'ACTIVE'
-      END AS "licenseState"
-    FROM "User" u
-    JOIN "Membership" m ON m."userId" = u."id" AND m."status" = 'ACTIVE'
-    JOIN "Tenant" t ON t."id" = m."tenantId"
-    WHERE u."email" = $1
-    LIMIT 1
-    `,
-    email
+  const user = await db.user.findUnique({
+    where: { email: email.toLowerCase().trim() },
+    select: { id: true },
+  });
+  if (!user) return { ok: false, active: false, reason: "USER_NOT_FOUND" };
+
+  const now = new Date();
+
+  // user -> memberships -> tenant -> tenantModules
+  const memberships = await db.membership.findMany({
+    where: {
+      userId: user.id,
+      status: { in: ["ACTIVE", "INVITED"] }, // kako ti koristiš
+    },
+    select: {
+      tenantId: true,
+      tenant: {
+        select: {
+          id: true,
+          name: true,
+          code: true,
+          tenantModules: {
+            where: { status: "ACTIVE" },
+            select: { startsAt: true, endsAt: true, seatLimit: true, moduleId: true },
+          },
+        },
+      },
+    },
+  });
+
+  // validno ako postoji bar jedan ACTIVE module gde je "now" u opsegu
+  const valid = memberships.some((m) =>
+    (m.tenant?.tenantModules ?? []).some((tm) => {
+      const s = tm.startsAt ?? new Date(0);
+      const e = tm.endsAt ?? new Date("2999-12-31");
+      return now >= s && now <= e;
+    })
   );
 
-  return result[0] ?? null;
-}
-
-export function isActiveInPeriod(
-  startsAt: Date | null,
-  endsAt: Date | null,
-  now = new Date()
-) {
-  if (startsAt && startsAt > now) return false;
-  if (endsAt && endsAt < now) return false;
-  return true;
+  return { ok: true, active: valid };
 }
