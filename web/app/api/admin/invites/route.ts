@@ -143,6 +143,13 @@ export async function POST(req: Request) {
     // access ends: max endsAt, or null if no endsAt set on any module
     const accessEndsAt = ends.length ? maxDate(ends) : null;
 
+// ❗ require at least one module with defined end date
+if (!accessEndsAt) {
+  return NextResponse.json(
+    { ok: false, error: "NO_MODULE_LICENSE_END_DEFINED" },
+    { status: 400 }
+  );
+}
     // Invite link validity (default 7 days)
     const rawAmount = clampInt(body?.validity?.amount, 1, 3650);
     const rawUnit = String(body?.validity?.unit || "").toUpperCase();

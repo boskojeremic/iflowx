@@ -38,32 +38,28 @@ export default async function OGLayout({ children }: { children: React.ReactNode
 
         {/* DB-driven modules */}
         <div className="space-y-4">
-          {nav.map((p) => (
-            <div key={p.platformCode}>
-              <div className="text-sm font-semibold text-white/80 mb-2">
-                {p.platformName}
-              </div>
+  {nav.map((p, idx) => (
+    <div key={idx}>
+      <div className="flex flex-col gap-2">
+        {p.modules.map((m) => (
+          <Link
+            key={m.code}
+            href={m.routePath}
+            className="block rounded px-3 py-2 bg-white/5 border border-white/10 hover:bg-white/10"
+          >
+            {m.name}
+          </Link>
+        ))}
+      </div>
+    </div>
+  ))}
 
-              <div className="flex flex-col gap-2">
-                {p.modules.map((m) => (
-                  <Link
-                    key={m.code}
-                    href={m.routePath}
-                    className="block rounded px-3 py-2 bg-white/5 border border-white/10 hover:bg-white/10"
-                  >
-                    {m.name}
-                  </Link>
-                ))}
-              </div>
-            </div>
-          ))}
-
-          {nav.length === 0 && (
-            <div className="text-xs text-white/50">
-              No modules assigned to this tenant yet.
-            </div>
-          )}
-        </div>
+  {nav.length === 0 && (
+    <div className="text-xs text-white/50">
+      No modules assigned to this tenant yet.
+    </div>
+  )}
+</div>
       </aside>
 
       <main className="flex-1 p-6">{children}</main>

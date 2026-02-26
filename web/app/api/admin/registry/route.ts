@@ -27,15 +27,17 @@ export async function GET() {
     where: { isActive: true },
     orderBy: { code: "asc" },
     include: {
-      platforms: {
+      modules: {
         where: { isActive: true },
         orderBy: [{ sortOrder: "asc" }, { code: "asc" }],
-        include: {
-          modules: {
-            where: { isActive: true },
-            orderBy: [{ sortOrder: "asc" }, { code: "asc" }],
-            select: { id: true, code: true, name: true, routePath: true, isAddon: true, sortOrder: true },
-          },
+        select: {
+          id: true,
+          code: true,
+          name: true,
+          routePath: true,
+          isAddon: true,
+          sortOrder: true,
+          industryId: true,
         },
       },
     },

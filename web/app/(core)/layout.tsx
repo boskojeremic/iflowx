@@ -30,11 +30,12 @@ export default async function CoreAppLayout({
       <main className="flex-1 min-w-0">
         {/* header bar */}
         <div className="h-14 px-6 flex items-center justify-end border-b">
-          {!user.isSuperAdmin && lic && lic.licenseState !== "ACTIVE" && (
-            <div className="text-xs px-3 py-1 rounded-md border">
-              License status: <b>{lic.licenseState}</b>
-            </div>
-          )}
+          {!user.isSuperAdmin && lic && (
+  <div className="text-xs px-3 py-1 rounded-md border">
+    License status: <b>{lic.active ? "ACTIVE" : "INACTIVE"}</b>
+    {!lic.active && lic.reason ? <span className="ml-2 opacity-70">({lic.reason})</span> : null}
+  </div>
+)}
         </div>
 
         {/* centered content */}

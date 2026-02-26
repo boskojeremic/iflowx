@@ -372,7 +372,7 @@ export default function LicensingPanel() {
                 <AdminRowButton
                   onClick={() => toggle(r.mod.id)}
                   disabled={busy}
-                  variant={statusLabel === "ACTIVE" ? "green" : "purple"}
+                  variant={statusLabel === "ACTIVE" ? "green" : undefined}
                 >
                   {statusLabel}
                 </AdminRowButton>

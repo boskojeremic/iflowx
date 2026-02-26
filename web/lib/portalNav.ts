@@ -1,4 +1,3 @@
-// lib/portalNav.ts
 import { db } from "@/lib/db";
 
 export async function getGroupedPortalNavForTenant(tenantId: string) {
@@ -17,49 +16,68 @@ export async function getGroupedPortalNavForTenant(tenantId: string) {
       module: {
         isActive: true,
         routePath: { not: null },
-        platform: { isActive: true },
       },
     },
     select: {
       module: {
         select: {
+          id: true,
           name: true,
           routePath: true,
           sortOrder: true,
-          platform: {
-            select: { id: true, name: true, sortOrder: true },
+          industry: {
+            select: {
+              id: true,
+              name: true,
+              sortOrder: true,
+            },
           },
         },
       },
     },
     orderBy: [
-      { module: { platform: { sortOrder: "asc" } } },
+      { module: { industry: { sortOrder: "asc" } } },
       { module: { sortOrder: "asc" } },
       { module: { name: "asc" } },
     ],
   });
 
-  // group by platformId
-  const map = new Map<string, { title: string; pSort: number; items: { label: string; href: string; mSort: number }[] }>();
+  const map = new Map<
+    string,
+    {
+      title: string;
+      iSort: number;
+      items: { label: string; href: string; mSort: number }[];
+    }
+  >();
 
   for (const r of rows) {
     const m = r.module;
-    if (!m?.routePath) continue;
+    if (!m?.routePath || !m.industry) continue;
 
-    const pid = m.platform.id;
-    if (!map.has(pid)) {
-      map.set(pid, { title: m.platform.name, pSort: m.platform.sortOrder ?? 100, items: [] });
+    const iid = m.industry.id;
+
+    if (!map.has(iid)) {
+      map.set(iid, {
+        title: m.industry.name,
+        iSort: m.industry.sortOrder ?? 100,
+        items: [],
+      });
     }
-    map.get(pid)!.items.push({ label: m.name, href: m.routePath, mSort: m.sortOrder ?? 100 });
+
+    map.get(iid)!.items.push({
+      label: m.name,
+      href: m.routePath,
+      mSort: m.sortOrder ?? 100,
+    });
   }
 
-  // sort groups + items
   return Array.from(map.values())
-    .sort((a, b) => (a.pSort - b.pSort) || a.title.localeCompare(b.title))
+    .sort((a, b) => a.iSort - b.iSort || a.title.localeCompare(b.title))
     .map((g) => ({
       title: g.title,
       items: g.items
-        .sort((a, b) => (a.mSort - b.mSort) || a.label.localeCompare(b.label))
+        .sort((a, b) => a.mSort - b.mSort || a.label.localeCompare(b.label))
         .map(({ label, href }) => ({ label, href })),
     }));
 }
