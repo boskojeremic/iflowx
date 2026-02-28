@@ -4,6 +4,17 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { AdminRowButton } from "@/components/core-admin/AdminButtons";
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
 type Industry = { id: string; name: string; code: string };
 type Tenant = { id: string; name: string; code: string };
 
@@ -30,7 +41,6 @@ function pad(n: number) {
   return String(n).padStart(2, "0");
 }
 
-// input[type=date] expects YYYY-MM-DD
 function toDateInputValue(iso: string | null) {
   if (!iso) return "";
   const d = new Date(iso);
@@ -39,7 +49,6 @@ function toDateInputValue(iso: string | null) {
 
 function fromDateInputValue(v: string) {
   if (!v) return null;
-  // interpret as local date 00:00
   const [y, m, d] = v.split("-").map(Number);
   return new Date(y, (m || 1) - 1, d || 1);
 }
@@ -71,6 +80,10 @@ export default function LicensingPanel() {
 
   const [busy, setBusy] = useState(false);
 
+  // ✅ confirm only for DISABLE (one-way)
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmTarget, setConfirmTarget] = useState<{ moduleId: string; moduleName: string } | null>(null);
+
   async function loadIndustries() {
     const r = await fetch("/api/industries", { cache: "no-store" });
     const d = await r.json().catch(() => null);
@@ -99,8 +112,7 @@ export default function LicensingPanel() {
       cache: "no-store",
     });
     const d = await r.json().catch(() => null);
-    const list: ModuleRow[] = d?.modules ?? [];
-    setModules(list);
+    setModules((d?.modules ?? []) as ModuleRow[]);
   }
 
   async function loadTenantModules(tid: string, indId: string) {
@@ -109,13 +121,11 @@ export default function LicensingPanel() {
       return;
     }
 
-    // server returns tenantModules only for modules in this industry (recommended)
     const r = await fetch(
-      `/api/admin/tenant-modules?tenantId=${encodeURIComponent(tid)}&industryId=${encodeURIComponent(
-        indId
-      )}`,
+      `/api/admin/tenant-modules?tenantId=${encodeURIComponent(tid)}&industryId=${encodeURIComponent(indId)}`,
       { cache: "no-store" }
     );
+
     const d = await r.json().catch(() => null);
 
     if (!r.ok || !d?.ok) {
@@ -143,7 +153,6 @@ export default function LicensingPanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenantId, industryId]);
 
-  // map for quick access
   const tmByModuleId = useMemo(() => {
     const m = new Map<string, TenantModuleRow>();
     for (const x of tenantModules) m.set(x.moduleId, x);
@@ -151,7 +160,6 @@ export default function LicensingPanel() {
   }, [tenantModules]);
 
   const rows = useMemo(() => {
-    // render modules from selected industry, sorted by sortOrder then name
     return [...modules]
       .filter((x) => x.industryId === industryId)
       .sort((a, b) => (a.sortOrder ?? 100) - (b.sortOrder ?? 100) || a.name.localeCompare(b.name))
@@ -163,20 +171,11 @@ export default function LicensingPanel() {
         const endsAt = tm?.endsAt ?? null;
         const status = tm?.status ?? "DISABLED";
 
-        // derived status (auto-enable when today in range)
         const s = startsAt ? new Date(startsAt) : null;
         const e = endsAt ? new Date(endsAt) : null;
-        const shouldBeActive = isTodayBetween(s, e);
+        const derivedActive = isTodayBetween(s, e) ? "ACTIVE" : "DISABLED";
 
-        return {
-          mod,
-          tm,
-          seatLimit,
-          startsAt,
-          endsAt,
-          status,
-          derivedStatus: shouldBeActive ? "ACTIVE" : "DISABLED",
-        };
+        return { mod, tm, seatLimit, startsAt, endsAt, status, derivedActive };
       });
   }, [modules, industryId, tmByModuleId]);
 
@@ -188,11 +187,7 @@ export default function LicensingPanel() {
       const r = await fetch("/api/admin/tenant-modules", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          tenantId,
-          moduleId,
-          ...patch,
-        }),
+        body: JSON.stringify({ tenantId, moduleId, ...patch }),
       });
 
       const d = await r.json().catch(() => null);
@@ -201,7 +196,6 @@ export default function LicensingPanel() {
         return;
       }
 
-      // refresh
       await loadTenantModules(tenantId, industryId);
     } finally {
       setBusy(false);
@@ -213,7 +207,7 @@ export default function LicensingPanel() {
   }
 
   async function onChangeDates(moduleId: string, startsAt: Date | null, endsAt: Date | null) {
-    // auto status
+    // ✅ Active is driven ONLY by dates
     const autoStatus = isTodayBetween(startsAt, endsAt) ? "ACTIVE" : "DISABLED";
 
     await saveRow(moduleId, {
@@ -223,41 +217,22 @@ export default function LicensingPanel() {
     });
   }
 
-  async function toggle(moduleId: string) {
-    const tm = tmByModuleId.get(moduleId) || null;
+  async function disableByButton(moduleId: string) {
+  const tm = tmByModuleId.get(moduleId) || null;
 
-    // If currently ACTIVE -> disable: set endsAt = yesterday, keep startsAt, set status DISABLED
-    if (tm && tm.status === "ACTIVE") {
-      const y = yesterday();
-      const s = tm.startsAt ? new Date(tm.startsAt) : null;
+  const y = yesterday();
+  const s = tm?.startsAt ? new Date(tm.startsAt) : new Date();
 
-      await saveRow(moduleId, {
-        startsAt: s ? s.toISOString() : new Date().toISOString(),
-        endsAt: y.toISOString(),
-        status: "DISABLED",
-      });
-      return;
-    }
+  await saveRow(moduleId, {
+    startsAt: s.toISOString(),
+    endsAt: y.toISOString(),
+    status: "DISABLED",
+  });
 
-    // If DISABLED -> enable
-    // Ensure dates exist; if missing, set: start=today, end=+30d (you can change default)
-    const now = new Date();
-    const start = tm?.startsAt ? new Date(tm.startsAt) : now;
-    const end = tm?.endsAt ? new Date(tm.endsAt) : (() => {
-      const x = new Date(now);
-      x.setDate(x.getDate() + 30);
-      return x;
-    })();
-
-    const autoStatus = isTodayBetween(start, end) ? "ACTIVE" : "DISABLED";
-    // user wants ENABLE now -> force ACTIVE, but only if today is within; otherwise keep DISABLED
-    // (you can also force ACTIVE always, but this matches your "between dates" rule)
-    await saveRow(moduleId, {
-      startsAt: start.toISOString(),
-      endsAt: end.toISOString(),
-      status: autoStatus,
-    });
-  }
+  toast.success("Module disabled", {
+    description: "The module has been successfully disabled for this tenant.",
+  });
+}
 
   return (
     <div className="space-y-4 text-white">
@@ -312,9 +287,8 @@ export default function LicensingPanel() {
           const startVal = toDateInputValue(r.startsAt);
           const endVal = toDateInputValue(r.endsAt);
 
-          // UI status: if today between dates => show ACTIVE, else show stored tm.status (but we also auto-save on date change)
-          const showActive = r.derivedStatus === "ACTIVE" && (tm?.status !== "DISABLED");
-          const statusLabel = showActive ? "ACTIVE" : "DISABLED";
+          // ✅ status shown is derived from dates (and saved on date change)
+          const statusLabel: "ACTIVE" | "DISABLED" = r.derivedActive;
 
           return (
             <div
@@ -359,9 +333,9 @@ export default function LicensingPanel() {
                   type="date"
                   className="w-full px-2 py-1 bg-black/40 border border-white/20 rounded"
                   value={endVal}
-                  onChange={(e) => {
+                  onChange={(ev) => {
                     const s = fromDateInputValue(startVal);
-                    const en = fromDateInputValue(e.target.value);
+                    const en = fromDateInputValue(ev.target.value);
                     onChangeDates(r.mod.id, s, en);
                   }}
                   disabled={busy}
@@ -370,7 +344,18 @@ export default function LicensingPanel() {
 
               <div className="col-span-2 flex justify-end">
                 <AdminRowButton
-                  onClick={() => toggle(r.mod.id)}
+                  onClick={() => {
+                    // ✅ one-way: only ACTIVE can be disabled by click
+                    if (statusLabel !== "ACTIVE") {
+                      toast.message("Info", {
+                        description: "ACTIVE status se dobija samo promenom datuma (Start/End).",
+                      });
+                      return;
+                    }
+
+                    setConfirmTarget({ moduleId: r.mod.id, moduleName: r.mod.name });
+                    setConfirmOpen(true);
+                  }}
                   disabled={busy}
                   variant={statusLabel === "ACTIVE" ? "green" : undefined}
                 >
@@ -385,6 +370,41 @@ export default function LicensingPanel() {
           <div className="p-4 text-sm text-white/60">No modules for selected Industry.</div>
         )}
       </div>
+
+      {/* ✅ Confirm dialog */}
+      <AlertDialog
+        open={confirmOpen}
+        onOpenChange={(open) => {
+          setConfirmOpen(open);
+          if (!open) setConfirmTarget(null);
+        }}
+      >
+        <AlertDialogContent className="border border-white/10 bg-[#0b0f0e] text-white shadow-xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Disable module?</AlertDialogTitle>
+            <AlertDialogDescription className="text-white/70">
+              Do you want to disable <b className="text-white">{confirmTarget?.moduleName}</b> for this tenant?
+              <br />
+                          </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="border border-white/15 bg-white/5 text-white hover:bg-white/10">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700 text-white"
+              onClick={async () => {
+                if (!confirmTarget) return;
+                await disableByButton(confirmTarget.moduleId);
+                setConfirmOpen(false);
+                setConfirmTarget(null);
+              }}
+            >
+              Yes, disable
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -6,6 +6,7 @@ import IndustryPanel from "@/components/core-admin/IndustryPanel";
 import ModulesPanel from "@/components/core-admin/ModulesPanel";
 import LicensingPanel from "@/components/core-admin/LicensingPanel";
 import TenantsPanel from "@/components/core-admin/TenantsPanel";
+import TenantControlPanel from "@/components/core-admin/TenantControlPanel";
 
 const tabs = [
   { key: "industry", label: "Industry" },
@@ -75,7 +76,7 @@ const tab = ((sp?.get("tab") as TabKey | null) ?? "industry");
           {tab === "industry" && <IndustryPanel />}
           {tab === "modules" && <ModulesPanel />}
           {tab === "tenants" && <TenantsPanel />}
-          {tab === "tenant-control" && <div>Tenant Control form</div>}
+          {tab === "tenant-control" && <TenantControlPanel />}
           {tab === "licensing" && <LicensingPanel />}
           {tab === "users" && <div>Users form</div>}
         </div>
