@@ -8,15 +8,12 @@ datasource db {
 }
 
 model Tenant {
-  id       String  @id @default(cuid())
-  name     String
-  code     String  @unique
-  isActive Boolean @default(true)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // ✅ inverse relations (OBAVEZNO zbog Prisma validation)
+  id               String               @id @default(cuid())
+  name             String
+  code             String               @unique
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  isActive         Boolean              @default(true)
   apiKeys          ApiKey[]
   assets           Asset[]
   results          EmissionResult[]
@@ -27,36 +24,39 @@ model Tenant {
   readings         MeasurementReading[]
   members          Membership[]
   periods          ReportingPeriod[]
-
-  tenantModules    TenantModule[]
   tenantIndustries TenantIndustry[]
+  tenantModules    TenantModule[]
 }
 
 model User {
-  id           String       @id @default(cuid())
-  email        String       @unique
-  name         String?
-  createdAt    DateTime     @default(now())
-  passwordHash String?
-  isSuperAdmin Boolean      @default(false)
-  accounts     Account[]
-  memberships  Membership[]
-  sessions     Session[]
+  id                 String       @id @default(cuid())
+  email              String       @unique
+  name               String?
+  createdAt          DateTime     @default(now())
+  passwordHash       String?
+  isSuperAdmin       Boolean      @default(false)
+  accounts           Account[]
+  membershipsCreated Membership[] @relation("MembershipCreatedBy")
+  memberships        Membership[] @relation("MembershipUser")
+  sessions           Session[]
 }
 
 model Membership {
-  id             String           @id @default(cuid())
-  tenantId       String
-  userId         String
-  role           MemberRole       @default(VIEWER)
-  createdAt      DateTime         @default(now())
-  status         MembershipStatus @default(ACTIVE)
-  accessStartsAt DateTime?        @db.Timestamp(6)
-  accessEndsAt   DateTime?        @db.Timestamp(6)
-  tenant         Tenant           @relation(fields: [tenantId], references: [id])
-  user           User             @relation(fields: [userId], references: [id])
+  id              String           @id @default(cuid())
+  tenantId        String
+  userId          String
+  role            MemberRole       @default(VIEWER)
+  createdAt       DateTime         @default(now())
+  status          MembershipStatus @default(ACTIVE)
+  accessStartsAt  DateTime?        @db.Timestamp(6)
+  accessEndsAt    DateTime?        @db.Timestamp(6)
+  createdByUserId String?
+  createdByUser   User?            @relation("MembershipCreatedBy", fields: [createdByUserId], references: [id])
+  tenant          Tenant           @relation(fields: [tenantId], references: [id])
+  user            User             @relation("MembershipUser", fields: [userId], references: [id])
 
-  @@unique([tenantId, userId])
+  @@unique([tenantId, userId], name: "tenantId_userId")
+  @@index([createdByUserId])
   @@index([tenantId])
   @@index([userId])
   @@index([accessEndsAt], map: "idx_membership_access_end")
@@ -282,6 +282,72 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
+model Industry {
+  id               String           @id @default(cuid())
+  code             String           @unique
+  name             String
+  isActive         Boolean          @default(true)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  sortOrder        Int              @default(100)
+  modules          Module[]
+  tenantIndustries TenantIndustry[]
+}
+
+model Module {
+  id            String         @id @default(cuid())
+  code          String
+  name          String
+  description   String?
+  routePath     String?
+  isAddon       Boolean        @default(true)
+  isActive      Boolean        @default(true)
+  sortOrder     Int            @default(100)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  industryId    String
+  industry      Industry       @relation(fields: [industryId], references: [id], onDelete: Cascade)
+  tenantModules TenantModule[]
+
+  @@unique([industryId, code])
+  @@index([industryId])
+}
+
+model TenantIndustry {
+  id         String    @id @default(cuid())
+  tenantId   String
+  industryId String
+  status     String    @default("ACTIVE")
+  startsAt   DateTime? @db.Timestamp(6)
+  endsAt     DateTime? @db.Timestamp(6)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  industry   Industry  @relation(fields: [industryId], references: [id], onDelete: Cascade)
+  tenant     Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, industryId])
+  @@index([tenantId])
+  @@index([industryId])
+}
+
+model TenantModule {
+  id        String             @id @default(cuid())
+  tenantId  String
+  moduleId  String
+  status    TenantModuleStatus @default(ACTIVE)
+  startsAt  DateTime?          @db.Timestamp(6)
+  endsAt    DateTime?          @db.Timestamp(6)
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+  seatLimit Int                @default(1)
+  module    Module             @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  tenant    Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, moduleId])
+  @@index([tenantId])
+  @@index([moduleId])
+}
+
 enum MemberRole {
   OWNER
   ADMIN
@@ -340,77 +406,6 @@ enum ReadingQuality {
 enum TenantRole {
   TENANT_ADMIN
   TENANT_USER
-}
-
-model Industry {
-  id        String   @id @default(cuid())
-  code      String   @unique
-  name      String
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  sortOrder Int      @default(100)
-  modules   Module[]
-  tenantIndustries TenantIndustry[]
-}
-
-model Module {
-  id          String   @id @default(cuid())
-  industryId  String
-  code        String
-  name        String
-  description String?
-  routePath   String?
-  isAddon     Boolean  @default(true)
-  isActive    Boolean  @default(true)
-  sortOrder   Int      @default(100)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  industry      Industry       @relation(fields: [industryId], references: [id], onDelete: Cascade)
-  tenantModules TenantModule[]
-
-  @@unique([industryId, code])
-  @@index([industryId])
-}
-
-model TenantIndustry {
-  id         String    @id @default(cuid())
-  tenantId   String
-  industryId String
-  status     String    @default("ACTIVE")
-  startsAt   DateTime? @db.Timestamp(6)
-  endsAt     DateTime? @db.Timestamp(6)
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-
-  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  industry Industry @relation(fields: [industryId], references: [id], onDelete: Cascade)
-
-  @@unique([tenantId, industryId])
-  @@index([tenantId])
-  @@index([industryId])
-}
-
-model TenantModule {
-  id        String             @id @default(cuid())
-  tenantId  String
-  moduleId  String
-  status    TenantModuleStatus @default(ACTIVE)
-
-  seatLimit Int                @default(1)
-  startsAt  DateTime?          @db.Timestamp(6)
-  endsAt    DateTime?          @db.Timestamp(6)
-
-  createdAt DateTime           @default(now())
-  updatedAt DateTime           @updatedAt
-
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  module Module @relation(fields: [moduleId], references: [id], onDelete: Cascade)
-
-  @@unique([tenantId, moduleId])
-  @@index([tenantId])
-  @@index([moduleId])
 }
 
 enum TenantModuleStatus {

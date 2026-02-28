@@ -1,5 +1,5 @@
 "use client"
-
+console.log("USING SIDEBAR.TSX FROM:", __filename);
 import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
 import { PanelLeftIcon } from "lucide-react"
@@ -72,6 +72,17 @@ function SidebarProvider({
   // This is the internal state of the sidebar.
   // We use openProp and setOpenProp for control from outside the component.
   const [_open, _setOpen] = React.useState(defaultOpen)
+    // Init from cookie (client only) so state doesn't "randomly" collapse
+  React.useEffect(() => {
+    if (openProp !== undefined || setOpenProp) return; // controlled from outside
+    try {
+      const m = document.cookie.match(
+        new RegExp(`${SIDEBAR_COOKIE_NAME}=(true|false)`)
+      );
+      if (m) _setOpen(m[1] === "true");
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const open = openProp ?? _open
   const setOpen = React.useCallback(
     (value: boolean | ((value: boolean) => boolean)) => {
@@ -187,7 +198,7 @@ function Sidebar({
           data-sidebar="sidebar"
           data-slot="sidebar"
           data-mobile="true"
-          className="bg-sidebar text-sidebar-foreground w-(--sidebar-width) p-0 [&>button]:hidden"
+          className="bg-sidebar group-data-[variant=floating]:border-sidebar-border flex h-full w-full min-h-0 flex-col group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:shadow-sm"
           style={
             {
               "--sidebar-width": SIDEBAR_WIDTH_MOBILE,
@@ -374,12 +385,12 @@ function SidebarContent({ className, ...props }: React.ComponentProps<"div">) {
       data-slot="sidebar-content"
       data-sidebar="content"
       className={cn(
-        "flex min-h-0 flex-1 flex-col gap-2 overflow-auto group-data-[collapsible=icon]:overflow-hidden",
+        "flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overflow-x-hidden overscroll-contain pr-1",
         className
       )}
       {...props}
     />
-  )
+  );
 }
 
 function SidebarGroup({ className, ...props }: React.ComponentProps<"div">) {

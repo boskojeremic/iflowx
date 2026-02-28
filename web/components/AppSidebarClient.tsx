@@ -3,6 +3,8 @@
 import * as React from "react";
 import Link from "next/link";
 import { Home, LogOut, Settings } from "lucide-react";
+import { signOut } from "next-auth/react";
+import { Package, Factory, Flame, BarChart3, Boxes } from "lucide-react";
 
 import {
   AlertDialog,
@@ -30,8 +32,23 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 
-type SidebarModule = { label: string; href: string };
-type SidebarGroupData = { title: string; items: SidebarModule[] };
+type SidebarModule = { code: string; label: string; href: string };
+type SidebarGroupData = { key: string; title: string; items: SidebarModule[] };
+
+const moduleIcon = (code: string) => {
+  switch (code) {
+    case "PRO":
+      return <Package className="mr-2 h-4 w-4" />;
+    case "FOP":
+      return <Factory className="mr-2 h-4 w-4" />;
+    case "GHG":
+      return <Flame className="mr-2 h-4 w-4" />;
+    case "REP":
+      return <BarChart3 className="mr-2 h-4 w-4" />;
+    default:
+      return <Boxes className="mr-2 h-4 w-4" />;
+  }
+};
 
 export default function AppSidebarClient({
   groups,
@@ -93,7 +110,10 @@ export default function AppSidebarClient({
                   {group.items.map((item) => (
                     <SidebarMenuItem key={item.href}>
                       <SidebarMenuButton asChild className="w-full justify-start">
-                        <Link href={item.href}>{item.label}</Link>
+                        <Link href={item.href} className="flex items-center">
+  {moduleIcon(item.code)}
+  {item.label}
+</Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
                   ))}
@@ -103,7 +123,7 @@ export default function AppSidebarClient({
           ))}
         </SidebarContent>
 
-        {/* LOGOUT */}
+        {/* LOGOUT (dole) */}
         <SidebarFooter className="px-3 pb-3">
           <SidebarMenu>
             <SidebarMenuItem>
@@ -124,24 +144,13 @@ export default function AppSidebarClient({
                   </AlertDialogHeader>
 
                   <AlertDialogFooter>
-                    {/* Cancel kao na Delete dialogu */}
                     <AlertDialogCancel className="bg-white/10 hover:bg-white/15 text-white border border-white/15">
                       Cancel
                     </AlertDialogCancel>
 
-                    {/* Logout zelen */}
                     <AlertDialogAction
                       className="bg-green-600 hover:bg-green-700 text-white"
-                      onClick={async () => {
-                        await fetch("/api/auth/logout", {
-                          method: "POST",
-                          credentials: "include",
-                          cache: "no-store",
-                        });
-
-                        // bitno za prod: replace, ne href
-                        window.location.replace("/login");
-                      }}
+                      onClick={() => signOut({ callbackUrl: "/login" })}
                     >
                       Logout
                     </AlertDialogAction>
