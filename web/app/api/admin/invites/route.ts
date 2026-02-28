@@ -175,18 +175,20 @@ if (!accessEndsAt) {
       select: { id: true, email: true },
     });
 
-    // STEP 2: membership INVITED admin (NO access window here - module licensing controls access)
+    // STEP 2: membership INVITED admin (track who assigned)
 await db.membership.upsert({
   where: { tenantId_userId: { tenantId, userId: invitedUser.id } },
   update: {
     role: "ADMIN",
     status: "INVITED",
+    createdByUserId: me.id,
   },
   create: {
     tenantId,
     userId: invitedUser.id,
     role: "ADMIN",
     status: "INVITED",
+    createdByUserId: me.id,
   },
   select: { id: true },
 });
