@@ -288,7 +288,7 @@ export default function LicensingPanel() {
           const endVal = toDateInputValue(r.endsAt);
 
           // ✅ status shown is derived from dates (and saved on date change)
-          const statusLabel: "ACTIVE" | "DISABLED" = r.derivedActive;
+          const statusLabel = r.derivedActive as "ACTIVE" | "DISABLED";
 
           return (
             <div
