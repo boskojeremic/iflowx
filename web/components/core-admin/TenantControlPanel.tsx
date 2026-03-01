@@ -13,6 +13,22 @@ type Member = {
   user: { id: string; email: string; name: string | null; isSuperAdmin: boolean };
 };
 
+type UserRow = {
+  id: string;
+  email: string;
+  name: string | null;
+  isSuperAdmin: boolean;
+  createdAt: string;
+};
+
+function safeJson(text: string) {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
+
 export default function TenantControlPanel() {
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [tenantId, setTenantId] = useState<string>("");
@@ -21,7 +37,9 @@ export default function TenantControlPanel() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const [inviteEmail, setInviteEmail] = useState("");
+  const [users, setUsers] = useState<UserRow[]>([]);
+  const [selectedUserId, setSelectedUserId] = useState<string>("");
+
   const [saving, setSaving] = useState(false);
 
   async function loadTenants() {
@@ -55,10 +73,36 @@ export default function TenantControlPanel() {
     setLoading(false);
   }
 
+  async function loadUsers() {
+    // koristi postojeći Core Admin endpoint koji si već napravio
+    const res = await fetch("/api/core-admin/users", { cache: "no-store" });
+    const text = await res.text();
+    const ct = res.headers.get("content-type") || "";
+
+    if (!res.ok) {
+      const j = safeJson(text);
+      throw new Error(j?.error ? String(j.error) : `USERS_API_${res.status}`);
+    }
+    if (!ct.includes("application/json")) {
+      throw new Error("USERS_API_NOT_JSON");
+    }
+
+    const data = JSON.parse(text);
+    const list: UserRow[] = data?.users ?? [];
+    setUsers(list);
+
+    // default izbor: prvi non-superadmin, ili prvi u listi
+    if (!selectedUserId && list.length) {
+      const firstNonSA = list.find((u) => !u.isSuperAdmin);
+      setSelectedUserId((firstNonSA ?? list[0]).id);
+    }
+  }
+
   useEffect(() => {
     (async () => {
       try {
         await loadTenants();
+        await loadUsers();
       } catch (e: any) {
         setError(String(e?.message ?? e));
       }
@@ -76,18 +120,29 @@ export default function TenantControlPanel() {
     [members]
   );
 
+  const selectedUser = useMemo(
+    () => users.find((u) => u.id === selectedUserId) ?? null,
+    [users, selectedUserId]
+  );
+
   async function sendAdminInvite() {
     if (!tenantId) return;
 
-    const email = inviteEmail.trim().toLowerCase();
+    if (!selectedUserId || !selectedUser?.email) {
+      setError("Select a user.");
+      return;
+    }
+
+    const email = selectedUser.email.trim().toLowerCase();
     if (!email) {
-      setError("Enter admin email.");
+      setError("Selected user has no email.");
       return;
     }
 
     setError("");
     setSaving(true);
 
+    // koristi postojeći endpoint (ne diramo backend)
     const r = await fetch("/api/admin/invites", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -107,7 +162,6 @@ export default function TenantControlPanel() {
       return;
     }
 
-    setInviteEmail("");
     await loadMembers(tenantId);
   }
 
@@ -124,7 +178,7 @@ export default function TenantControlPanel() {
         <div className="flex items-center gap-3">
           <div className="text-xs text-white/60">Tenant</div>
           <select
-            className="border border-white/20 bg-black/30 rounded px-3 py-2"
+            className="h-9 border border-white/20 bg-black/30 rounded-md px-3"
             value={tenantId}
             onChange={(e) => setTenantId(e.target.value)}
           >
@@ -137,7 +191,7 @@ export default function TenantControlPanel() {
 
           <button
             onClick={() => tenantId && loadMembers(tenantId)}
-            className="px-3 py-2 bg-white/10 border border-white/15 rounded hover:bg-white/15"
+            className="h-9 px-3 bg-white/10 border border-white/15 rounded-md hover:bg-white/15 disabled:opacity-50"
             disabled={!tenantId || saving}
           >
             Refresh
@@ -158,22 +212,36 @@ export default function TenantControlPanel() {
           <div className="border border-white/15 rounded p-4 bg-white/5">
             <div className="font-semibold mb-2">Invite Tenant Admin</div>
 
-            <div className="flex flex-col md:flex-row gap-2">
-              <input
-                className="flex-1 border border-white/20 bg-black/30 rounded px-3 py-2"
-                placeholder="admin@email.com"
-                value={inviteEmail}
-                onChange={(e) => setInviteEmail(e.target.value)}
-              />
+            <div className="flex flex-col md:flex-row gap-2 items-stretch">
+              <select
+                className="h-9 flex-1 border border-white/20 bg-black/30 rounded-md px-3"
+                value={selectedUserId}
+                onChange={(e) => setSelectedUserId(e.target.value)}
+                disabled={saving}
+              >
+                {users.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {(u.name ? `${u.name} — ` : "")}
+                    {u.email}
+                    {u.isSuperAdmin ? " (SUPER)" : ""}
+                  </option>
+                ))}
+              </select>
 
               <button
                 onClick={sendAdminInvite}
-                disabled={saving}
-                className="px-4 py-2 bg-purple-600 rounded hover:bg-purple-700 disabled:opacity-50"
+                disabled={saving || !selectedUserId}
+                className="h-9 px-4 bg-purple-600 rounded-md hover:bg-purple-700 disabled:opacity-50"
               >
                 {saving ? "Sending…" : "Send Admin Invite"}
               </button>
             </div>
+
+            {selectedUser ? (
+              <div className="text-xs text-white/50 mt-2">
+                Selected: <span className="text-white/70">{selectedUser.email}</span>
+              </div>
+            ) : null}
 
             <div className="text-xs text-white/50 mt-2">
               Super Admin invites only Tenant Admins. Tenant Admin will manage users inside tenant.

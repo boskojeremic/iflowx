@@ -7,6 +7,7 @@ import ModulesPanel from "@/components/core-admin/ModulesPanel";
 import LicensingPanel from "@/components/core-admin/LicensingPanel";
 import TenantsPanel from "@/components/core-admin/TenantsPanel";
 import TenantControlPanel from "@/components/core-admin/TenantControlPanel";
+import UsersPanel from "@/components/core-admin/UsersPanel";
 
 const tabs = [
   { key: "industry", label: "Industry" },
@@ -34,8 +35,7 @@ const tab = ((sp?.get("tab") as TabKey | null) ?? "industry");
             Global configuration (Industries / Platforms / Modules) + Tenant governance
           </p>
           {/* DEBUG */}
-          <div className="mt-2 text-xs text-white/40">TAB = {tab}</div>
-        </div>
+                  </div>
       </div>
     </div>
 
@@ -78,7 +78,7 @@ const tab = ((sp?.get("tab") as TabKey | null) ?? "industry");
           {tab === "tenants" && <TenantsPanel />}
           {tab === "tenant-control" && <TenantControlPanel />}
           {tab === "licensing" && <LicensingPanel />}
-          {tab === "users" && <div>Users form</div>}
+          {tab === "users" && <UsersPanel />}
         </div>
       </div>
     </div>

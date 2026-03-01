@@ -213,8 +213,11 @@ await db.membership.upsert({
 
     console.log("[INVITES] invite created:", invite.id);
 
-    const baseUrl = getBaseUrl();
-    const inviteUrl = `${baseUrl}/invite/${token}`;
+    const baseUrl = await getBaseUrl();
+const inviteUrl = `${baseUrl}/invite/${token}`;
+if (typeof inviteUrl !== "string" || inviteUrl.includes("[object Promise]")) {
+  return NextResponse.json({ ok: false, error: "BAD_INVITE_URL" }, { status: 500 });
+}
     console.log("[INVITES] baseUrl/inviteUrl:", { baseUrl, inviteUrl });
 
     let emailed = false;

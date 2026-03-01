@@ -1,17 +1,30 @@
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Button } from "@/components/ui/button"
+import { redirect } from "next/navigation";
 
-export default function ActivityPage() {
+import LicenseStatusCard from "@/components/LicenseStatusCard";
+import { getCurrentUser } from "@/lib/authz";
+
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+
+export default async function ActivityPage() {
+  const me = await getCurrentUser();
+  if (!me) redirect("/login");
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Activity Data</h1>
-        <p className="text-sm text-muted-foreground">
-          Enter source data for emissions calculation.
-        </p>
+      <div className="space-y-4">
+        <div>
+          <h1 className="text-3xl font-bold">Activity Data</h1>
+          <p className="text-sm text-muted-foreground">
+            Enter source data for emissions calculation.
+          </p>
+        </div>
+
+        {/* License Status (user + tenant + role) */}
+        <LicenseStatusCard />
       </div>
 
       <Tabs defaultValue="fuel" className="w-full">
@@ -124,8 +137,5 @@ export default function ActivityPage() {
         </TabsContent>
       </Tabs>
     </div>
-  )
+  );
 }
-
-  
-  

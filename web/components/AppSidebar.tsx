@@ -1,5 +1,5 @@
 // components/AppSidebar.tsx
-import AppSidebarClient from "./AppSidebarClient";
+import AppSidebarHydrationSafe from "./AppSidebarHydrationSafe";
 import { getPortalNavForUserTenant } from "@/lib/portal-nav";
 
 export type SidebarItem = {
@@ -30,7 +30,7 @@ export default async function AppSidebar({
       key: String(g.industryCode ?? g.industryName ?? "IND"),
       title: String(g.industryName ?? "Modules"),
       items: (g.modules ?? [])
-        .filter((m: any) => !!m?.routePath) // sigurnost
+        .filter((m: any) => !!m?.routePath)
         .map((m: any) => ({
           code: String(m.code ?? ""),
           label: String(m.name ?? m.code ?? "Module"),
@@ -39,5 +39,5 @@ export default async function AppSidebar({
     }))
     .filter((g) => g.items.length > 0);
 
-  return <AppSidebarClient groups={groups} showCoreAdmin={showCoreAdmin} />;
+  return <AppSidebarHydrationSafe groups={groups} showCoreAdmin={showCoreAdmin} />;
 }

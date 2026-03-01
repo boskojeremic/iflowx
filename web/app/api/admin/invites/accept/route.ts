@@ -49,20 +49,36 @@ export async function POST(req: Request) {
 
   const passwordHash = await bcrypt.hash(password, 10);
 
-  const user = await db.user.upsert({
-    where: { email: invite.email },
-    update: {
-      name: name || undefined,
-      passwordHash,
-    },
-    create: {
+  const existing = await db.user.findUnique({
+  where: { email: invite.email },
+  select: { id: true, email: true },
+});
+
+let user: { id: string; email: string };
+
+if (existing) {
+  // ✅ existing user: do NOT overwrite password
+  user = existing;
+
+  // opcionalno: update name samo ako je prazno i ako je poslato
+  if (name) {
+    await db.user.update({
+      where: { id: existing.id },
+      data: { name },
+    });
+  }
+} else {
+  const passwordHash = await bcrypt.hash(password, 10);
+
+  user = await db.user.create({
+    data: {
       email: invite.email,
       name: name || undefined,
       passwordHash,
     },
     select: { id: true, email: true },
   });
-
+}
   await db.membership.upsert({
     where: {
       tenantId_userId: {
