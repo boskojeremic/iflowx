@@ -10,10 +10,7 @@ export async function GET(req: Request) {
     const token = String(url.searchParams.get("token") || "").trim();
 
     if (!token) {
-      return NextResponse.json(
-        { ok: false, error: "MISSING_TOKEN" },
-        { status: 400 }
-      );
+      return NextResponse.json({ ok: false, error: "MISSING_TOKEN" }, { status: 400 });
     }
 
     const tokenHash = hashToken(token);
@@ -33,29 +30,31 @@ export async function GET(req: Request) {
     });
 
     if (!invite) {
-      return NextResponse.json(
-        { ok: false, error: "INVALID_TOKEN" },
-        { status: 404 }
-      );
+      return NextResponse.json({ ok: false, error: "INVALID_TOKEN" }, { status: 404 });
     }
 
     if (invite.acceptedAt) {
-      return NextResponse.json(
-        { ok: false, error: "INVITE_ALREADY_USED" },
-        { status: 400 }
-      );
+      return NextResponse.json({ ok: false, error: "INVITE_ALREADY_USED" }, { status: 400 });
     }
 
     if (invite.expiresAt.getTime() <= Date.now()) {
-      return NextResponse.json(
-        { ok: false, error: "INVITE_EXPIRED" },
-        { status: 400 }
-      );
+      return NextResponse.json({ ok: false, error: "INVITE_EXPIRED" }, { status: 400 });
+    }
+
+    // ✅ user MUST exist (created by Core Admin)
+    const user = await db.user.findUnique({
+      where: { email: invite.email },
+      select: { name: true, email: true },
+    });
+
+    if (!user) {
+      return NextResponse.json({ ok: false, error: "USER_NOT_FOUND" }, { status: 404 });
     }
 
     return NextResponse.json({
       ok: true,
       email: invite.email,
+      name: user.name, // ✅ NEW
       role: invite.role,
       expiresAt: invite.expiresAt,
       tenant: invite.tenant,
