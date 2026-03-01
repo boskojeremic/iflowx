@@ -27,12 +27,7 @@ export async function POST(req: Request) {
       acceptedAt: null,
       expiresAt: { gt: new Date() },
     },
-    select: {
-      id: true,
-      tenantId: true,
-      email: true,
-      role: true,
-    },
+    select: { id: true, tenantId: true, email: true, role: true },
   });
 
   if (!invite) {
@@ -49,27 +44,23 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "USER_NOT_FOUND" }, { status: 404 });
   }
 
-    const passwordHash = await bcrypt.hash(password, 10);
+  // ✅ optional guard: disallow re-setting password via invite
+  if (user.passwordHash) {
+    return NextResponse.json({ ok: false, error: "PASSWORD_ALREADY_SET" }, { status: 400 });
+  }
 
+  const passwordHash = await bcrypt.hash(password, 10);
+
+  // ✅ ONLY update passwordHash (NO name/email)
   await db.user.update({
     where: { id: user.id },
     data: { passwordHash },
   });
 
   await db.membership.upsert({
-    where: {
-      tenantId_userId: { tenantId: invite.tenantId, userId: user.id },
-    },
-    update: {
-      role: invite.role as any,
-      status: "ACTIVE",
-    },
-    create: {
-      tenantId: invite.tenantId,
-      userId: user.id,
-      role: invite.role as any,
-      status: "ACTIVE",
-    },
+    where: { tenantId_userId: { tenantId: invite.tenantId, userId: user.id } },
+    update: { role: invite.role as any, status: "ACTIVE" },
+    create: { tenantId: invite.tenantId, userId: user.id, role: invite.role as any, status: "ACTIVE" },
   });
 
   await db.invite.update({
