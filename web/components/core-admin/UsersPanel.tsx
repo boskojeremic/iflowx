@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
+import DeleteConfirm from "@/components/DeleteConfirm";
 
 type UserRow = {
   id: string;
@@ -35,8 +37,8 @@ export default function UsersPanel() {
     [editingId, rows]
   );
 
-  async function load() {
-    setErr(null);
+  async function load(silent?: boolean) {
+    if (!silent) setErr(null);
     setBusy(true);
     try {
       const res = await fetch(`/api/core-admin/users`, { cache: "no-store" });
@@ -46,13 +48,17 @@ export default function UsersPanel() {
       if (!res.ok) {
         const j = safeJson(text);
         setRows([]);
-        setErr(j?.error ? `${j.error}` : `USERS_API_${res.status}`);
+        const msg = j?.error ? `${j.error}` : `USERS_API_${res.status}`;
+        setErr(msg);
+        if (!silent) toast.error(msg);
         console.error(text);
         return;
       }
       if (!ct.includes("application/json")) {
         setRows([]);
-        setErr("USERS_API_NOT_JSON");
+        const msg = "USERS_API_NOT_JSON";
+        setErr(msg);
+        if (!silent) toast.error(msg);
         console.error(text);
         return;
       }
@@ -66,7 +72,10 @@ export default function UsersPanel() {
 
   async function addUser() {
     const e = email.trim().toLowerCase();
-    if (!e) return;
+    if (!e) {
+      toast.error("EMAIL_REQUIRED");
+      return;
+    }
 
     setErr(null);
     setBusy(true);
@@ -80,14 +89,17 @@ export default function UsersPanel() {
       const text = await res.text();
       if (!res.ok) {
         const j = safeJson(text);
-        setErr(j?.error ? `${j.error}` : `ADD_USER_${res.status}`);
+        const msg = j?.error ? `${j.error}` : `ADD_USER_${res.status}`;
+        setErr(msg);
+        toast.error(msg);
         console.error(text);
         return;
       }
 
       setEmail("");
       setName("");
-      await load();
+      toast.success("User created");
+      await load(true);
     } finally {
       setBusy(false);
     }
@@ -111,6 +123,7 @@ export default function UsersPanel() {
     const e = editEmail.trim().toLowerCase();
     if (!e) {
       setErr("EMAIL_REQUIRED");
+      toast.error("EMAIL_REQUIRED");
       return;
     }
 
@@ -129,7 +142,9 @@ export default function UsersPanel() {
       const text = await res.text();
       if (!res.ok) {
         const j = safeJson(text);
-        setErr(j?.error ? `${j.error}` : `EDIT_USER_${res.status}`);
+        const msg = j?.error ? `${j.error}` : `EDIT_USER_${res.status}`;
+        setErr(msg);
+        toast.error(msg);
         console.error(text);
         return;
       }
@@ -137,21 +152,14 @@ export default function UsersPanel() {
       setEditingId(null);
       setEditName("");
       setEditEmail("");
-      await load();
+      toast.success("User updated");
+      await load(true);
     } finally {
       setBusy(false);
     }
   }
 
   async function deleteUser(id: string) {
-    const row = rows.find(r => r.id === id);
-if (row?.isSuperAdmin) {
-  if (!confirm("This is a SUPER ADMIN. Are you sure you want to delete?")) return;
-} else {
-  if (!confirm("Delete this user?")) return;
-}
-    if (!confirm("Delete this user?")) return;
-
     setErr(null);
     setBusy(true);
     try {
@@ -162,20 +170,24 @@ if (row?.isSuperAdmin) {
 
       if (!res.ok) {
         const j = safeJson(text);
-        setErr(j?.error ? `${j.error}` : `DELETE_USER_${res.status}`);
+        const msg = j?.error ? `${j.error}` : `DELETE_USER_${res.status}`;
+        setErr(msg);
+        toast.error(msg);
         console.error(text);
         return;
       }
 
       if (editingId === id) cancelEdit();
-      await load();
+      toast.success("User deleted");
+      await load(true);
     } finally {
       setBusy(false);
     }
   }
 
   useEffect(() => {
-    load();
+    load(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
@@ -221,7 +233,7 @@ if (row?.isSuperAdmin) {
         </button>
 
         <button
-          onClick={load}
+          onClick={() => load()}
           disabled={busy}
           className="h-9 rounded-md bg-white/[0.06] px-4 text-sm hover:bg-white/10 border border-white/10 disabled:opacity-50"
         >
@@ -242,6 +254,7 @@ if (row?.isSuperAdmin) {
         <div className="divide-y divide-white/10">
           {rows.map((u) => {
             const isEditing = editingId === u.id;
+            const isSuper = !!u.isSuperAdmin;
 
             return (
               <div key={u.id} className="grid grid-cols-12 gap-2 px-3 py-2 text-sm items-center">
@@ -287,7 +300,7 @@ if (row?.isSuperAdmin) {
                   )}
                 </div>
 
-                <div className="col-span-1 text-white/60">{u.isSuperAdmin ? "SUPER" : "USER"}</div>
+                <div className="col-span-1 text-white/60">{isSuper ? "SUPER" : "USER"}</div>
 
                 <div className="col-span-2 flex justify-end gap-2">
                   {isEditing ? (
@@ -316,14 +329,26 @@ if (row?.isSuperAdmin) {
                       >
                         Edit
                       </button>
-                      <button
-                        onClick={() => deleteUser(u.id)}
-                        disabled={busy || editingId === u.id}
-                        className="h-9 rounded-md bg-red-600 px-4 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
-                        title={editingId === u.id ? "Cancel edit first" : "Delete user"}
-                      >
-                        Delete
-                      </button>
+
+                      {/* ✅ Standard DeleteConfirm, bez confirm() */}
+                      <DeleteConfirm
+                        title={isSuper ? "Delete Super Admin?" : "Delete User?"}
+                        description={
+                          isSuper
+                            ? `This will permanently delete the SUPER ADMIN "${u.email}" and all related data.`
+                            : `This will permanently delete "${u.email}" and all related data.`
+                        }
+                        onConfirm={() => deleteUser(u.id)}
+                        trigger={
+                          <button
+                            disabled={busy || editingId === u.id}
+                            className="h-9 rounded-md bg-red-600 px-4 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+                            title={editingId === u.id ? "Cancel edit first" : "Delete user"}
+                          >
+                            Delete
+                          </button>
+                        }
+                      />
                     </>
                   )}
                 </div>
