@@ -6,7 +6,6 @@ export default function InviteClient({ token }: { token: string }) {
   const [email, setEmail] = useState<string>("");
   const [tenantLabel, setTenantLabel] = useState<string>("");
   const [role, setRole] = useState<string>("");
-  const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [error, setError] = useState<string>("");
@@ -59,7 +58,7 @@ export default function InviteClient({ token }: { token: string }) {
       const r = await fetch("/api/invites/accept", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, name, password }),
+        body: JSON.stringify({ token, password }), // ✅ ONLY password
       });
 
       const d = await r.json().catch(() => null);
@@ -69,7 +68,6 @@ export default function InviteClient({ token }: { token: string }) {
         return;
       }
 
-      // nakon accept → vodi na login
       window.location.href = "/login";
     } catch (e) {
       console.error(e);
@@ -85,21 +83,20 @@ export default function InviteClient({ token }: { token: string }) {
       <div className="border border-white/15 rounded-xl p-6 w-[420px] space-y-3 bg-black/20">
         <h1 className="text-xl font-semibold">Complete your registration</h1>
 
-        <div className="text-sm opacity-80">
-          <div><b>Tenant:</b> {tenantLabel}</div>
-          <div><b>Email:</b> {email}</div>
-          <div><b>Role:</b> {role}</div>
+        <div className="text-sm opacity-80 space-y-1">
+          <div>
+            <b>Tenant:</b> {tenantLabel}
+          </div>
+          <div>
+            <b>Email:</b> {email}
+          </div>
+          <div>
+            <b>Role:</b> {role}
+          </div>
         </div>
 
         <input
-          className="w-full py-2 rounded-md bg-black text-white hover:bg-black/80"
-          placeholder="Name (optional)"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
-
-        <input
-          className="w-full py-2 rounded-md bg-black text-white hover:bg-black/80"
+          className="w-full py-2 rounded-md bg-black text-white hover:bg-black/80 px-3 border border-white/10"
           placeholder="Password (min 8 chars)"
           type="password"
           value={password}
@@ -109,12 +106,12 @@ export default function InviteClient({ token }: { token: string }) {
         {error && <div className="text-red-400 text-sm">{error}</div>}
 
         <button
-  type="button"
-  className="w-full py-2 rounded-md bg-black text-white hover:bg-black/80"
-  onClick={accept}
->  Accept invite
-</button>
-
+          type="button"
+          className="w-full py-2 rounded-md bg-black text-white hover:bg-black/80 border border-white/10"
+          onClick={accept}
+        >
+          Accept invite
+        </button>
       </div>
     </div>
   );

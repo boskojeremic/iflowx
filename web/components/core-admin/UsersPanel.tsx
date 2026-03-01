@@ -203,26 +203,27 @@ export default function UsersPanel() {
       ) : null}
 
       <div className="flex flex-col gap-2 md:flex-row md:items-center">
-        <input
-          className="h-9 w-full md:w-[360px] rounded-md border border-white/10 bg-white/[0.04] px-3 text-sm outline-none"
-          placeholder="email@company.com"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") addUser();
-          }}
-          disabled={busy}
-        />
-        <input
-          className="h-9 w-full md:w-[280px] rounded-md border border-white/10 bg-white/[0.04] px-3 text-sm outline-none"
-          placeholder="Full name (optional)"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") addUser();
-          }}
-          disabled={busy}
-        />
+       <input
+  className="h-9 w-full md:w-[280px] rounded-md border border-white/10 bg-white/[0.04] px-3 text-sm outline-none"
+  placeholder="Full Name"
+  value={name}
+  onChange={(e) => setName(e.target.value)}
+  onKeyDown={(e) => {
+    if (e.key === "Enter") addUser();
+  }}
+  disabled={busy}
+/>
+
+<input
+  className="h-9 w-full md:w-[360px] rounded-md border border-white/10 bg-white/[0.04] px-3 text-sm outline-none"
+  placeholder="email@company.com"
+  value={email}
+  onChange={(e) => setEmail(e.target.value)}
+  onKeyDown={(e) => {
+    if (e.key === "Enter") addUser();
+  }}
+  disabled={busy}
+/>
 
         <button
           onClick={addUser}
