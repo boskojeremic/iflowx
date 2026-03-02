@@ -29,6 +29,13 @@ function safeJson(text: string) {
   }
 }
 
+function normalizeTenants(payload: any): Tenant[] {
+  // podrži oba oblika: [..] ili {ok:true, tenants:[..]}
+  if (Array.isArray(payload)) return payload as Tenant[];
+  if (payload && typeof payload === "object" && Array.isArray(payload.tenants)) return payload.tenants as Tenant[];
+  return [];
+}
+
 export default function TenantControlPanel() {
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [tenantId, setTenantId] = useState<string>("");
@@ -43,13 +50,23 @@ export default function TenantControlPanel() {
   const [saving, setSaving] = useState(false);
 
   async function loadTenants() {
-    const r = await fetch("/api/core-admin/tenants", { cache: "no-store" });
+    // ✅ FIX: pravi endpoint
+    const r = await fetch("/api/admin/tenants", { cache: "no-store" });
     const d = await r.json().catch(() => null);
-    if (!r.ok || !d?.ok) throw new Error(d?.error ?? `Failed (HTTP ${r.status})`);
 
-    const list: Tenant[] = d.tenants ?? [];
+    if (!r.ok) throw new Error((d && d.error) ? String(d.error) : `TENANTS_HTTP_${r.status}`);
+
+    // podrži oba shapa
+    const list = normalizeTenants(d);
+
+    // ako API vraća {ok:false,...}
+    if (d && typeof d === "object" && "ok" in d && d.ok === false) {
+      throw new Error(d?.error ?? "TENANTS_API_FAIL");
+    }
+
     setTenants(list);
 
+    // auto-select prvog tenant-a
     if (!tenantId && list[0]?.id) setTenantId(list[0].id);
   }
 
@@ -57,14 +74,15 @@ export default function TenantControlPanel() {
     setError("");
     setLoading(true);
 
-    const r = await fetch(`/api/core-admin/memberships?tenantId=${encodeURIComponent(tid)}`, {
+    // ✅ FIX: pravi endpoint
+    const r = await fetch(`/api/admin/memberships?tenantId=${encodeURIComponent(tid)}`, {
       cache: "no-store",
     });
     const d = await r.json().catch(() => null);
 
     if (!r.ok || !d?.ok) {
       setMembers([]);
-      setError(d?.error ?? `Failed (HTTP ${r.status})`);
+      setError(d?.error ?? `MEMBERSHIPS_HTTP_${r.status}`);
       setLoading(false);
       return;
     }
@@ -74,14 +92,15 @@ export default function TenantControlPanel() {
   }
 
   async function loadUsers() {
-    // koristi postojeći Core Admin endpoint koji si već napravio
+    // ✅ FIX: pravi endpoint (ako ti je core-admin/users ostao, ostavi ga,
+    // ali po tvojoj novoj strukturi je /api/core-admin/users)
     const res = await fetch("/api/core-admin/users", { cache: "no-store" });
     const text = await res.text();
     const ct = res.headers.get("content-type") || "";
 
     if (!res.ok) {
       const j = safeJson(text);
-      throw new Error(j?.error ? String(j.error) : `USERS_API_${res.status}`);
+      throw new Error(j?.error ? String(j.error) : `USERS_HTTP_${res.status}`);
     }
     if (!ct.includes("application/json")) {
       throw new Error("USERS_API_NOT_JSON");
@@ -91,7 +110,6 @@ export default function TenantControlPanel() {
     const list: UserRow[] = data?.users ?? [];
     setUsers(list);
 
-    // default izbor: prvi non-superadmin, ili prvi u listi
     if (!selectedUserId && list.length) {
       const firstNonSA = list.find((u) => !u.isSuperAdmin);
       setSelectedUserId((firstNonSA ?? list[0]).id);
@@ -101,10 +119,13 @@ export default function TenantControlPanel() {
   useEffect(() => {
     (async () => {
       try {
+        setLoading(true);
         await loadTenants();
         await loadUsers();
       } catch (e: any) {
         setError(String(e?.message ?? e));
+      } finally {
+        setLoading(false);
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -142,8 +163,8 @@ export default function TenantControlPanel() {
     setError("");
     setSaving(true);
 
-    // koristi postojeći endpoint (ne diramo backend)
-    const r = await fetch("/api/core-admin/invites", {
+    // ✅ FIX: pravi endpoint
+    const r = await fetch("/api/admin/invites", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -158,11 +179,25 @@ export default function TenantControlPanel() {
     setSaving(false);
 
     if (!r.ok || !d?.ok) {
-      setError(d?.error ?? `Invite failed (HTTP ${r.status})`);
+      setError(d?.error ?? `INVITE_HTTP_${r.status}`);
       return;
     }
 
     await loadMembers(tenantId);
+  }
+
+  async function hardReloadAll() {
+    try {
+      setError("");
+      setLoading(true);
+      await loadTenants();
+      if (tenantId) await loadMembers(tenantId);
+      await loadUsers();
+    } catch (e: any) {
+      setError(String(e?.message ?? e));
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -181,20 +216,34 @@ export default function TenantControlPanel() {
             className="h-9 border border-white/20 bg-black/30 rounded-md px-3"
             value={tenantId}
             onChange={(e) => setTenantId(e.target.value)}
+            disabled={loading || saving}
           >
-            {tenants.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name} ({t.code})
-              </option>
-            ))}
+            {tenants.length === 0 ? (
+              <option value="">{loading ? "Loading..." : "No tenants"}</option>
+            ) : (
+              tenants.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name} ({t.code})
+                </option>
+              ))
+            )}
           </select>
 
           <button
             onClick={() => tenantId && loadMembers(tenantId)}
             className="h-9 px-3 bg-white/10 border border-white/15 rounded-md hover:bg-white/15 disabled:opacity-50"
-            disabled={!tenantId || saving}
+            disabled={!tenantId || saving || loading}
           >
             Refresh
+          </button>
+
+          <button
+            onClick={hardReloadAll}
+            className="h-9 px-3 bg-white/10 border border-white/15 rounded-md hover:bg-white/15 disabled:opacity-50"
+            disabled={saving || loading}
+            title="Reload tenants + members + users"
+          >
+            Reload
           </button>
         </div>
       </div>
@@ -219,18 +268,22 @@ export default function TenantControlPanel() {
                 onChange={(e) => setSelectedUserId(e.target.value)}
                 disabled={saving}
               >
-                {users.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {(u.name ? `${u.name} — ` : "")}
-                    {u.email}
-                    {u.isSuperAdmin ? " (SUPER)" : ""}
-                  </option>
-                ))}
+                {users.length === 0 ? (
+                  <option value="">No users</option>
+                ) : (
+                  users.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {(u.name ? `${u.name} — ` : "")}
+                      {u.email}
+                      {u.isSuperAdmin ? " (SUPER)" : ""}
+                    </option>
+                  ))
+                )}
               </select>
 
               <button
                 onClick={sendAdminInvite}
-                disabled={saving || !selectedUserId}
+                disabled={saving || !selectedUserId || !tenantId}
                 className="h-9 px-4 bg-purple-600 rounded-md hover:bg-purple-700 disabled:opacity-50"
               >
                 {saving ? "Sending…" : "Send Admin Invite"}
