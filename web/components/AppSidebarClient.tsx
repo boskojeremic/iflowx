@@ -2,9 +2,10 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Home, LogOut, Settings } from "lucide-react";
 import { signOut } from "next-auth/react";
-import { Package, Factory, Flame, BarChart3, Boxes } from "lucide-react";
+import { Home, LogOut, Settings, ShieldCheck } from "lucide-react";
+import { Package, Factory, Flame, BarChart3, Boxes, FileCheck } from "lucide-react";
+
 
 import {
   AlertDialog,
@@ -36,17 +37,21 @@ type SidebarModule = { code: string; label: string; href: string };
 type SidebarGroupData = { key: string; title: string; items: SidebarModule[] };
 
 const moduleIcon = (code: string) => {
-  switch (code) {
+  switch ((code || "").toUpperCase()) {
     case "PRO":
-      return <Package className="mr-2 h-4 w-4" />;
+      return <Package className="mr-2 h-4 w-4 shrink-0" />;
     case "FOP":
-      return <Factory className="mr-2 h-4 w-4" />;
+      return <Factory className="mr-2 h-4 w-4 shrink-0" />;
     case "GHG":
-      return <Flame className="mr-2 h-4 w-4" />;
+      return <Flame className="mr-2 h-4 w-4 shrink-0" />;
     case "REP":
-      return <BarChart3 className="mr-2 h-4 w-4" />;
+      return <BarChart3 className="mr-2 h-4 w-4 shrink-0" />;
+    case "HSE":
+      return <ShieldCheck className="mr-2 h-4 w-4 shrink-0" />; // ✅ HSE
+    case "ESG":
+      return <FileCheck className="mr-2 h-4 w-4 shrink-0" />; // ✅ ESG
     default:
-      return <Boxes className="mr-2 h-4 w-4" />;
+      return <Boxes className="mr-2 h-4 w-4 shrink-0" />;
   }
 };
 
@@ -71,13 +76,13 @@ export default function AppSidebarClient({
             <SidebarGroupContent>
               <SidebarMenu>
                 <SidebarMenuItem>
-                  <SidebarMenuButton asChild className="w-full justify-start">
-                    <Link href="/home">
-                      <Home className="mr-2 h-4 w-4" />
-                      Home
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
+  <SidebarMenuButton asChild className="w-full justify-start cursor-pointer uppercase tracking-wide">
+    <Link href="/home" className="flex items-center">
+      <Home className="mr-2 h-4 w-4" />
+      HOME
+    </Link>
+  </SidebarMenuButton>
+</SidebarMenuItem>
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
@@ -85,17 +90,17 @@ export default function AppSidebarClient({
           {/* SUPER ADMIN */}
           {showCoreAdmin && (
             <SidebarGroup>
-              <SidebarGroupLabel>Admin</SidebarGroupLabel>
+              <SidebarGroupLabel>ADMIN</SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu>
                   <SidebarMenuItem>
-                    <SidebarMenuButton asChild className="w-full justify-start">
-                      <Link href="/core-admin?tab=industry">
-                        <Settings className="mr-2 h-4 w-4" />
-                        Core Admin
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
+  <SidebarMenuButton asChild className="w-full justify-start cursor-pointer uppercase tracking-wide">
+    <Link href="/core-admin?tab=industry" className="flex items-center">
+      <Settings className="mr-2 h-4 w-4" />
+      CORE ADMIN
+    </Link>
+  </SidebarMenuButton>
+</SidebarMenuItem>
                 </SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>
@@ -109,12 +114,17 @@ export default function AppSidebarClient({
                 <SidebarMenu>
                   {group.items.map((item) => (
                     <SidebarMenuItem key={item.href}>
-                      <SidebarMenuButton asChild className="w-full justify-start">
-                        <Link href={item.href} className="flex items-center">
-  {moduleIcon(item.code)}
-  {item.label}
-</Link>
-                      </SidebarMenuButton>
+                      <SidebarMenuButton
+  asChild
+  className="w-full justify-start h-auto py-2"
+>
+  <Link href={item.href} className="flex items-start gap-2 w-full">
+    {moduleIcon(item.code)}
+    <span className="whitespace-normal break-words leading-snug text-left">
+      {item.label}
+    </span>
+  </Link>
+</SidebarMenuButton>
                     </SidebarMenuItem>
                   ))}
                 </SidebarMenu>
@@ -129,10 +139,10 @@ export default function AppSidebarClient({
             <SidebarMenuItem>
               <AlertDialog>
                 <AlertDialogTrigger asChild>
-                  <SidebarMenuButton className="w-full justify-start cursor-pointer">
-                    <LogOut className="mr-2 h-4 w-4" />
-                    Logout
-                  </SidebarMenuButton>
+                  <SidebarMenuButton className="w-full justify-start cursor-pointer uppercase tracking-wide">
+  <LogOut className="mr-2 h-4 w-4" />
+  LOGOUT
+</SidebarMenuButton>
                 </AlertDialogTrigger>
 
                 <AlertDialogContent className="bg-[#0b0f0d] border border-white/15 text-white shadow-2xl">
