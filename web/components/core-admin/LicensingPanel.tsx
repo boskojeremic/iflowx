@@ -92,7 +92,7 @@ export default function LicensingPanel() {
   }
 
   async function loadTenants() {
-    const r = await fetch("/api/admin/tenants", { cache: "no-store" });
+    const r = await fetch("/api/core-admin/tenants", { cache: "no-store" });
     const d = await r.json().catch(() => null);
     if (!r.ok || !d?.ok) {
       toast.error("Tenants load failed", { description: d?.error ?? `HTTP ${r.status}` });
@@ -122,7 +122,7 @@ export default function LicensingPanel() {
     }
 
     const r = await fetch(
-      `/api/admin/tenant-modules?tenantId=${encodeURIComponent(tid)}&industryId=${encodeURIComponent(indId)}`,
+      `/api/core-admin/tenant-modules?tenantId=${encodeURIComponent(tid)}&industryId=${encodeURIComponent(indId)}`,
       { cache: "no-store" }
     );
 
@@ -184,7 +184,7 @@ export default function LicensingPanel() {
 
     setBusy(true);
     try {
-      const r = await fetch("/api/admin/tenant-modules", {
+      const r = await fetch("/api/core-admin/tenant-modules", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ tenantId, moduleId, ...patch }),

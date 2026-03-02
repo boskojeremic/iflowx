@@ -40,7 +40,7 @@ export default function LoginClient() {
           // Najsigurnije: ako user nema membership, tenants može biti [], pa NE zaključujemo super admin po tome.
           // Zato ovde samo probamo: ako endpoint vrati ok, ide na /admin.
           setLoading(false);
-          window.location.assign("/admin");
+          window.location.assign("/core-admin");
           return;
         }
       }

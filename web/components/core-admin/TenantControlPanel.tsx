@@ -43,7 +43,7 @@ export default function TenantControlPanel() {
   const [saving, setSaving] = useState(false);
 
   async function loadTenants() {
-    const r = await fetch("/api/admin/tenants", { cache: "no-store" });
+    const r = await fetch("/api/core-admin/tenants", { cache: "no-store" });
     const d = await r.json().catch(() => null);
     if (!r.ok || !d?.ok) throw new Error(d?.error ?? `Failed (HTTP ${r.status})`);
 
@@ -57,7 +57,7 @@ export default function TenantControlPanel() {
     setError("");
     setLoading(true);
 
-    const r = await fetch(`/api/admin/memberships?tenantId=${encodeURIComponent(tid)}`, {
+    const r = await fetch(`/api/core-admin/memberships?tenantId=${encodeURIComponent(tid)}`, {
       cache: "no-store",
     });
     const d = await r.json().catch(() => null);
@@ -143,7 +143,7 @@ export default function TenantControlPanel() {
     setSaving(true);
 
     // koristi postojeći endpoint (ne diramo backend)
-    const r = await fetch("/api/admin/invites", {
+    const r = await fetch("/api/core-admin/invites", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

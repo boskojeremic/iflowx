@@ -13,7 +13,7 @@ export default function NewTenantPage() {
   async function createTenant() {
     setLoading(true);
 
-    const r = await fetch("/api/admin/tenants", {
+    const r = await fetch("/api/core-admin/tenants", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name, code }),
@@ -27,7 +27,7 @@ export default function NewTenantPage() {
       return;
     }
 
-    router.push("/admin/tenants");
+    router.push("/core-admin/tenants");
   }
 
   return (
