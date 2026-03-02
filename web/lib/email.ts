@@ -101,7 +101,7 @@ export async function sendInviteEmail(args: InviteEmailArgs) {
   `;
 
   await resend.emails.send({
-  from: "IFlowX <invite@dig-ops.com>",
+  from: "IFlowX <invite@mail.dig-ops.com>",
   to,
   subject: `IFlowX access invitation — ${tenantName}`,
   html,
