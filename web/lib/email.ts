@@ -101,13 +101,13 @@ export async function sendInviteEmail(args: InviteEmailArgs) {
   `;
 
   await resend.emails.send({
-  from: "IFlowX <no-reply@mail.dig-ops.com>",
+  from: "IFlowX <invite@mail.dig-ops.com>",
   to,
   subject: `IFlowX access invitation — ${tenantName}`,
   html: html,
 
   headers: {
-    "List-Unsubscribe": "<mailto:no-reply@dig-ops.com>",
+    "List-Unsubscribe": "<mailto:invite@dig-ops.com>",
   },
 });
 
