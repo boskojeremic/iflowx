@@ -111,3 +111,4 @@ export async function sendInviteEmail(args: InviteEmailArgs) {
     "X-Auto-Response-Suppress": "All",
   },
 });
+}
