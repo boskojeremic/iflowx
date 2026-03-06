@@ -65,7 +65,7 @@ export default function ModulesPanel() {
   }, [selectedIndustry, code]);
 
   async function loadIndustries() {
-    const res = await fetch("/api/industries", { cache: "no-store" });
+    const res = await fetch("/api/core-admin/industries", { cache: "no-store" });
     const data = await res.json();
     const list: Industry[] = data.industries || [];
     setIndustries(list);
@@ -81,7 +81,7 @@ export default function ModulesPanel() {
       return;
     }
     const res = await fetch(
-      `/api/modules?industryId=${encodeURIComponent(selectedIndustryId)}`,
+      `/api/core-admin/modules?industryId=${encodeURIComponent(selectedIndustryId)}`,
       { cache: "no-store" }
     );
     const data = await res.json();
@@ -132,7 +132,7 @@ export default function ModulesPanel() {
 
     setBusy(true);
     try {
-      const res = await fetch("/api/modules", {
+      const res = await fetch("/api/core-admin/modules", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -191,7 +191,7 @@ export default function ModulesPanel() {
 
     setBusy(true);
     try {
-      const res = await fetch(`/api/modules/${id}`, {
+      const res = await fetch(`/api/core-admin/modules/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -223,7 +223,7 @@ export default function ModulesPanel() {
   async function handleDelete(id: string, moduleName: string) {
     setBusy(true);
     try {
-      const res = await fetch(`/api/modules/${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/core-admin/modules/${id}`, { method: "DELETE" });
 
       if (res.ok) {
         toast.error("Module permanently deleted", {

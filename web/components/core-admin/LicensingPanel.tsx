@@ -85,7 +85,7 @@ export default function LicensingPanel() {
   const [confirmTarget, setConfirmTarget] = useState<{ moduleId: string; moduleName: string } | null>(null);
 
   async function loadIndustries() {
-    const r = await fetch("/api/industries", { cache: "no-store" });
+    const r = await fetch("/api/core-admin/industries", { cache: "no-store" });
     const d = await r.json().catch(() => null);
     setIndustries(d?.industries ?? []);
     if (!industryId && d?.industries?.[0]?.id) setIndustryId(d.industries[0].id);
@@ -108,7 +108,7 @@ export default function LicensingPanel() {
       setModules([]);
       return;
     }
-    const r = await fetch(`/api/modules?industryId=${encodeURIComponent(indId)}`, {
+    const r = await fetch(`/api/core-admin/modules?industryId=${encodeURIComponent(indId)}`, {
       cache: "no-store",
     });
     const d = await r.json().catch(() => null);

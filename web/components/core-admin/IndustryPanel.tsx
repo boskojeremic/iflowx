@@ -29,7 +29,7 @@ export default function IndustryPanel() {
   const upper = (v: unknown) => String(v ?? "").toUpperCase();
 
   async function load() {
-    const res = await fetch("/api/industries", { cache: "no-store" });
+    const res = await fetch("/api/core-admin/industries", { cache: "no-store" });
     const data = await res.json();
     setIndustries(data.industries || []);
   }
@@ -62,7 +62,7 @@ export default function IndustryPanel() {
 
     setBusy(true);
     try {
-      const res = await fetch("/api/industries", {
+      const res = await fetch("/api/core-admin/industries", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -106,7 +106,7 @@ export default function IndustryPanel() {
 
     setBusy(true);
     try {
-      const res = await fetch(`/api/industries/${id}`, {
+      const res = await fetch(`/api/core-admin/industries/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -136,7 +136,7 @@ export default function IndustryPanel() {
   async function handleDelete(id: string, indName: string) {
     setBusy(true);
     try {
-      const res = await fetch(`/api/industries/${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/core-admin/industries/${id}`, { method: "DELETE" });
 
       if (res.ok) {
         toast.error("Industry permanently deleted", {

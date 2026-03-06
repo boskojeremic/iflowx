@@ -8,24 +8,30 @@ datasource db {
 }
 
 model Tenant {
-  id               String               @id @default(cuid())
-  name             String
-  code             String               @unique
-  createdAt        DateTime             @default(now())
-  updatedAt        DateTime             @updatedAt
-  isActive         Boolean              @default(true)
-  apiKeys          ApiKey[]
-  assets           Asset[]
-  results          EmissionResult[]
-  emitters         Emitter[]
-  inputs           GHGInput[]
-  invites          Invite[]
-  points           MeasurementPoint[]
-  readings         MeasurementReading[]
-  members          Membership[]
-  periods          ReportingPeriod[]
-  tenantIndustries TenantIndustry[]
-  tenantModules    TenantModule[]
+  id                  String                @id @default(cuid())
+  name                String
+  code                String                @unique
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  isActive            Boolean               @default(true)
+  apiKeys             ApiKey[]
+  assets              Asset[]
+  CalculatedResult    CalculatedResult[]
+  results             EmissionResult[]
+  emitters            Emitter[]
+  Facility            Facility[]
+  FactorValue         FactorValue[]
+  inputs              GHGInput[]
+  invites             Invite[]
+  points              MeasurementPoint[]
+  readings            MeasurementReading[]
+  members             Membership[]
+  ReportDayStatus     ReportDayStatus[]
+  ReportRun           ReportRun[]
+  periods             ReportingPeriod[]
+  tenantIndustries    TenantIndustry[]
+  tenantModules       TenantModule[]
+  TenantReportDefault TenantReportDefault[]
 }
 
 model User {
@@ -80,22 +86,35 @@ model Invite {
 }
 
 model Asset {
-  id        String             @id @default(cuid())
-  tenantId  String
-  name      String
-  code      String
-  location  String?
-  createdAt DateTime           @default(now())
-  updatedAt DateTime           @updatedAt
-  apiKeys   ApiKey[]
-  tenant    Tenant             @relation(fields: [tenantId], references: [id])
-  results   EmissionResult[]
-  emitters  Emitter[]
-  inputs    GHGInput[]
-  points    MeasurementPoint[]
+  id             String             @id @default(cuid())
+  tenantId       String
+  name           String
+  code           String
+  location       String?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  assetRole      AssetRole          @default(PROCESS)
+  assetTypeId    String
+  facilityId     String
+  parentAssetId  String?
+  apiKeys        ApiKey[]
+  AssetType      AssetType          @relation(fields: [assetTypeId], references: [id])
+  Facility       Facility           @relation(fields: [facilityId], references: [id])
+  Asset          Asset?             @relation("AssetToAsset", fields: [parentAssetId], references: [id])
+  other_Asset    Asset[]            @relation("AssetToAsset")
+  tenant         Tenant             @relation(fields: [tenantId], references: [id])
+  AssetAttribute AssetAttribute[]
+  AssetParameter AssetParameter[]
+  results        EmissionResult[]
+  emitters       Emitter[]
+  inputs         GHGInput[]
+  points         MeasurementPoint[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
+  @@index([assetTypeId])
+  @@index([facilityId])
+  @@index([parentAssetId])
 }
 
 model ReportingPeriod {
@@ -205,26 +224,29 @@ model ApiKey {
 }
 
 model MeasurementPoint {
-  id        String               @id @default(cuid())
-  tenantId  String
-  assetId   String
-  emitterId String?
-  name      String
-  pointType PointType
-  tag       String
-  unit      String
-  isActive  Boolean              @default(true)
-  createdAt DateTime             @default(now())
-  updatedAt DateTime             @updatedAt
-  asset     Asset                @relation(fields: [assetId], references: [id])
-  emitter   Emitter?             @relation(fields: [emitterId], references: [id])
-  tenant    Tenant               @relation(fields: [tenantId], references: [id])
-  readings  MeasurementReading[]
+  id         String               @id @default(cuid())
+  tenantId   String
+  assetId    String
+  emitterId  String?
+  name       String
+  pointType  PointType
+  tag        String
+  unit       String
+  isActive   Boolean              @default(true)
+  createdAt  DateTime             @default(now())
+  updatedAt  DateTime             @updatedAt
+  facilityId String
+  asset      Asset                @relation(fields: [assetId], references: [id])
+  emitter    Emitter?             @relation(fields: [emitterId], references: [id])
+  Facility   Facility             @relation(fields: [facilityId], references: [id])
+  tenant     Tenant               @relation(fields: [tenantId], references: [id])
+  readings   MeasurementReading[]
 
   @@unique([tenantId, assetId, tag])
   @@index([tenantId])
   @@index([assetId])
   @@index([emitterId])
+  @@index([facilityId])
 }
 
 model MeasurementReading {
@@ -307,6 +329,7 @@ model Module {
   updatedAt     DateTime       @updatedAt
   industryId    String
   industry      Industry       @relation(fields: [industryId], references: [id], onDelete: Cascade)
+  ReportGroup   ReportGroup[]
   tenantModules TenantModule[]
 
   @@unique([industryId, code])
@@ -346,6 +369,333 @@ model TenantModule {
   @@unique([tenantId, moduleId])
   @@index([tenantId])
   @@index([moduleId])
+}
+
+model AssetAttribute {
+  id        String   @id
+  assetId   String
+  key       String
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime
+  Asset     Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@unique([assetId, key])
+  @@index([assetId])
+}
+
+model AssetParameter {
+  id          String    @id
+  assetId     String
+  parameterId String
+  required    Boolean   @default(true)
+  Asset       Asset     @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  Parameter   Parameter @relation(fields: [parameterId], references: [id], onDelete: Cascade)
+
+  @@unique([assetId, parameterId])
+  @@index([assetId])
+}
+
+model AssetType {
+  id        String  @id
+  code      String  @unique
+  name      String
+  isActive  Boolean @default(true)
+  sortOrder Int     @default(100)
+  Asset     Asset[]
+}
+
+model CalculatedResult {
+  id          String     @id
+  tenantId    String
+  day         DateTime   @db.Date
+  scopeLevel  ScopeLevel @default(EMITTER)
+  scopeId     String
+  parameterId String
+  value       Decimal    @db.Decimal(18, 6)
+  unit        String
+  trace       Json?
+  createdAt   DateTime   @default(now())
+  Parameter   Parameter  @relation(fields: [parameterId], references: [id], onDelete: Cascade)
+  Tenant      Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, day, scopeLevel, scopeId, parameterId])
+  @@index([day])
+  @@index([parameterId])
+  @@index([tenantId])
+}
+
+model Facility {
+  id               String             @id
+  tenantId         String
+  name             String
+  code             String
+  location         String?
+  isActive         Boolean            @default(true)
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime
+  Asset            Asset[]
+  Tenant           Tenant             @relation(fields: [tenantId], references: [id])
+  FactorValue      FactorValue[]
+  MeasurementPoint MeasurementPoint[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+}
+
+model FactorDefinition {
+  id          String        @id
+  key         String        @unique
+  name        String
+  defaultUnit String
+  description String?
+  isActive    Boolean       @default(true)
+  FactorValue FactorValue[]
+}
+
+model FactorValue {
+  id               String           @id
+  factorId         String
+  methodologyId    String?
+  scopeType        FactorScopeType
+  tenantId         String?
+  facilityId       String?
+  value            Decimal          @db.Decimal(18, 6)
+  unit             String
+  effectiveFrom    DateTime?        @db.Date
+  effectiveTo      DateTime?        @db.Date
+  Facility         Facility?        @relation(fields: [facilityId], references: [id], onDelete: Cascade)
+  FactorDefinition FactorDefinition @relation(fields: [factorId], references: [id], onDelete: Cascade)
+  Methodology      Methodology?     @relation(fields: [methodologyId], references: [id])
+  Tenant           Tenant?          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([facilityId])
+  @@index([factorId])
+  @@index([scopeType])
+  @@index([tenantId])
+}
+
+model Formula {
+  id                String           @id
+  reportId          String
+  methodologyId     String
+  outputParameterId String
+  expressionText    String
+  astJson           Json
+  scopeLevel        ScopeLevel       @default(EMITTER)
+  aggregationRule   AggregationRule  @default(SUM)
+  Methodology       Methodology      @relation(fields: [methodologyId], references: [id], onDelete: Cascade)
+  Parameter         Parameter        @relation(fields: [outputParameterId], references: [id])
+  ReportDefinition  ReportDefinition @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@index([methodologyId])
+  @@index([outputParameterId])
+  @@index([reportId])
+}
+
+model MethodProfile {
+  id                  String              @id
+  reportMethodologyId String
+  name                String?
+  isActive            Boolean             @default(true)
+  ReportMethodology   ReportMethodology   @relation(fields: [reportMethodologyId], references: [id], onDelete: Cascade)
+  MethodProfileItem   MethodProfileItem[]
+
+  @@index([reportMethodologyId])
+}
+
+model MethodProfileItem {
+  id              String        @id
+  methodProfileId String
+  parameterId     String
+  required        Boolean       @default(true)
+  sortOrder       Int           @default(100)
+  scopeLevel      ScopeLevel    @default(EMITTER)
+  MethodProfile   MethodProfile @relation(fields: [methodProfileId], references: [id], onDelete: Cascade)
+  Parameter       Parameter     @relation(fields: [parameterId], references: [id], onDelete: Cascade)
+
+  @@unique([methodProfileId, parameterId])
+  @@index([methodProfileId])
+  @@index([parameterId])
+}
+
+model Methodology {
+  id                  String                @id
+  code                String                @unique
+  name                String
+  isActive            Boolean               @default(true)
+  FactorValue         FactorValue[]
+  Formula             Formula[]
+  ReportMethodology   ReportMethodology[]
+  TenantReportDefault TenantReportDefault[]
+}
+
+model Observation {
+  id          String    @id
+  tenantId    String
+  facilityId  String
+  assetId     String
+  emitterId   String
+  parameterId String
+  day         DateTime  @db.Date
+  value       Decimal   @db.Decimal(18, 6)
+  unit        String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime
+  Parameter   Parameter @relation(fields: [parameterId], references: [id])
+
+  @@unique([tenantId, emitterId, parameterId, day])
+  @@index([tenantId, assetId, day])
+  @@index([tenantId, day])
+  @@index([tenantId, emitterId, parameterId, day])
+  @@index([tenantId, facilityId, day])
+}
+
+model Parameter {
+  id                 String              @id
+  code               String              @unique @db.VarChar(64)
+  name               String
+  dataType           ParameterDataType
+  sourceType         ParameterSourceType
+  responsibilityRole String
+  defaultUnit        String
+  canonicalUnit      String
+  description        String?
+  isActive           Boolean             @default(true)
+  sortOrder          Int                 @default(100)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime
+  groupId            String?
+  AssetParameter     AssetParameter[]
+  CalculatedResult   CalculatedResult[]
+  Formula            Formula[]
+  MethodProfileItem  MethodProfileItem[]
+  Observation        Observation[]
+  ParameterGroup     ParameterGroup?     @relation(fields: [groupId], references: [id])
+  ParameterUnit      ParameterUnit[]
+
+  @@index([groupId])
+  @@index([responsibilityRole])
+}
+
+model ParameterGroup {
+  id        String      @id
+  code      String      @unique
+  name      String
+  sortOrder Int         @default(100)
+  isActive  Boolean     @default(true)
+  Parameter Parameter[]
+}
+
+model ParameterUnit {
+  id          String    @id
+  parameterId String
+  unit        String
+  Parameter   Parameter @relation(fields: [parameterId], references: [id], onDelete: Cascade)
+
+  @@unique([parameterId, unit])
+  @@index([parameterId])
+}
+
+model ReportDayStatus {
+  id               String            @id
+  tenantId         String
+  reportId         String
+  day              DateTime          @db.Date
+  status           DayWorkflowStatus @default(DRAFT)
+  submittedAt      DateTime?
+  submittedBy      String?
+  approvedAt       DateTime?
+  approvedBy       String?
+  lockedAt         DateTime?
+  lockedBy         String?
+  ReportDefinition ReportDefinition  @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  Tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, reportId, day])
+  @@index([day])
+  @@index([reportId])
+  @@index([tenantId])
+}
+
+model ReportDefinition {
+  id                  String                @id
+  reportGroupId       String
+  code                String
+  name                String
+  description         String?
+  sortOrder           Int                   @default(100)
+  isActive            Boolean               @default(true)
+  Formula             Formula[]
+  ReportDayStatus     ReportDayStatus[]
+  ReportGroup         ReportGroup           @relation(fields: [reportGroupId], references: [id], onDelete: Cascade)
+  ReportMethodology   ReportMethodology[]
+  ReportRun           ReportRun[]
+  TenantReportDefault TenantReportDefault[]
+
+  @@unique([reportGroupId, code])
+  @@index([reportGroupId])
+}
+
+model ReportGroup {
+  id               String             @id
+  moduleId         String
+  code             String
+  name             String
+  sortOrder        Int                @default(100)
+  isActive         Boolean            @default(true)
+  ReportDefinition ReportDefinition[]
+  Module           Module             @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  @@unique([moduleId, code])
+  @@index([moduleId])
+}
+
+model ReportMethodology {
+  id               String           @id
+  reportId         String
+  methodologyId    String
+  MethodProfile    MethodProfile[]
+  Methodology      Methodology      @relation(fields: [methodologyId], references: [id], onDelete: Cascade)
+  ReportDefinition ReportDefinition @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@unique([reportId, methodologyId])
+  @@index([methodologyId])
+  @@index([reportId])
+}
+
+model ReportRun {
+  id                String           @id
+  tenantId          String
+  reportId          String
+  fromDate          DateTime         @db.Date
+  toDate            DateTime         @db.Date
+  methodologyId     String?
+  createdBy         String?
+  createdAt         DateTime         @default(now())
+  dashboardSnapshot Json?
+  documentHtml      String?
+  ReportDefinition  ReportDefinition @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  Tenant            Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([fromDate])
+  @@index([reportId])
+  @@index([tenantId])
+  @@index([toDate])
+}
+
+model TenantReportDefault {
+  id               String           @id
+  tenantId         String
+  reportId         String
+  methodologyId    String
+  Methodology      Methodology      @relation(fields: [methodologyId], references: [id], onDelete: Cascade)
+  ReportDefinition ReportDefinition @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  Tenant           Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, reportId])
+  @@index([reportId])
+  @@index([tenantId])
 }
 
 enum MemberRole {
@@ -411,4 +761,59 @@ enum TenantRole {
 enum TenantModuleStatus {
   ACTIVE
   DISABLED
+}
+
+enum AggregationRule {
+  SUM
+  AVG
+  LAST
+  MIN
+  MAX
+}
+
+enum AssetRole {
+  PROCESS
+  EMITTER
+  METER
+  UTILITY
+}
+
+enum DayWorkflowStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  LOCKED
+}
+
+enum FactorScopeType {
+  PLATFORM
+  TENANT
+  FACILITY
+}
+
+enum FinalValueSource {
+  MANUAL
+  SENSOR
+  OVERRIDE
+}
+
+enum ParameterDataType {
+  NUMBER
+  TEXT
+  BOOLEAN
+  ENUM
+}
+
+enum ParameterSourceType {
+  MANUAL
+  SENSOR
+  CALCULATED
+  CONSTANT
+}
+
+enum ScopeLevel {
+  EMITTER
+  ASSET
+  FACILITY
+  TENANT
 }
