@@ -76,17 +76,17 @@ export async function POST(req: Request) {
 
     const tenantId = String(body.tenantId || "").trim();
     const email = String(body.email || "").trim().toLowerCase();
+    const name = body.name === null ? null : String(body.name || "").trim() || null;
 
     // Core Admin flow: always ADMIN
     const role = "ADMIN";
 
-    console.log("[INVITES] payload:", { tenantId, email, role });
+    console.log("[INVITES] payload:", { tenantId, email, name, role });
 
     if (!tenantId || !email) {
       return NextResponse.json({ ok: false, error: "BAD_REQUEST" }, { status: 400 });
     }
 
-    // Permission
     const okAdmin = me.isSuperAdmin ? true : await requireAdmin(tenantId, me.id);
     console.log("[INVITES] okAdmin:", okAdmin);
 
@@ -94,7 +94,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: "FORBIDDEN" }, { status: 403 });
     }
 
-    // Tenant basic info (no tenant-level license anymore)
     const tenant = await db.tenant.findUnique({
       where: { id: tenantId },
       select: { id: true, name: true, code: true },
@@ -104,7 +103,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: "TENANT_NOT_FOUND" }, { status: 404 });
     }
 
-    // ✅ Guard: first admin invite allowed only after TenantModule licenses are configured
     const existingAdmins = await db.membership.count({
       where: { tenantId, role: { in: ["OWNER", "ADMIN"] } },
     });
@@ -121,7 +119,6 @@ export async function POST(req: Request) {
       }
     }
 
-    // ✅ Compute membership access window from ACTIVE TenantModules
     const tms = await db.tenantModule.findMany({
       where: { tenantId, status: "ACTIVE" },
       select: { startsAt: true, endsAt: true },
@@ -137,20 +134,16 @@ export async function POST(req: Request) {
     const starts = tms.map((x) => x.startsAt).filter((d): d is Date => !!d);
     const ends = tms.map((x) => x.endsAt).filter((d): d is Date => !!d);
 
-    // access starts: min startsAt, or now if none set
     const accessStartsAt = starts.length ? minDate(starts) : new Date();
-
-    // access ends: max endsAt, or null if no endsAt set on any module
     const accessEndsAt = ends.length ? maxDate(ends) : null;
 
-// ❗ require at least one module with defined end date
-if (!accessEndsAt) {
-  return NextResponse.json(
-    { ok: false, error: "NO_MODULE_LICENSE_END_DEFINED" },
-    { status: 400 }
-  );
-}
-    // Invite link validity (default 7 days)
+    if (!accessEndsAt) {
+      return NextResponse.json(
+        { ok: false, error: "NO_MODULE_LICENSE_END_DEFINED" },
+        { status: 400 }
+      );
+    }
+
     const rawAmount = clampInt(body?.validity?.amount, 1, 3650);
     const rawUnit = String(body?.validity?.unit || "").toUpperCase();
     const unitOk = rawUnit === "DAYS" || rawUnit === "MONTHS" || rawUnit === "YEARS";
@@ -167,33 +160,36 @@ if (!accessEndsAt) {
       expiresAt: expiresAt.toISOString(),
     });
 
-    // STEP 1: ensure user exists
+    // ensure user exists and preserve existing name if no new name provided
     const invitedUser = await db.user.upsert({
       where: { email },
-      update: {},
-      create: { email },
-      select: { id: true, email: true },
+      create: {
+        email,
+        name,
+      },
+      update: {
+        ...(name !== null ? { name } : {}),
+      },
+      select: { id: true, email: true, name: true },
     });
 
-    // STEP 2: membership INVITED admin (track who assigned)
-await db.membership.upsert({
-  where: { tenantId_userId: { tenantId, userId: invitedUser.id } },
-  update: {
-    role: "ADMIN",
-    status: "INVITED",
-    createdByUserId: me.id,
-  },
-  create: {
-    tenantId,
-    userId: invitedUser.id,
-    role: "ADMIN",
-    status: "INVITED",
-    createdByUserId: me.id,
-  },
-  select: { id: true },
-});
+    await db.membership.upsert({
+      where: { tenantId_userId: { tenantId, userId: invitedUser.id } },
+      update: {
+        role: "ADMIN",
+        status: "INVITED",
+        createdByUserId: me.id,
+      },
+      create: {
+        tenantId,
+        userId: invitedUser.id,
+        role: "ADMIN",
+        status: "INVITED",
+        createdByUserId: me.id,
+      },
+      select: { id: true },
+    });
 
-    // STEP 3: create invite token + record (invite expiry is link expiry)
     const token = generateInviteToken();
     const tokenHash = hashToken(token);
 
@@ -214,10 +210,12 @@ await db.membership.upsert({
     console.log("[INVITES] invite created:", invite.id);
 
     const baseUrl = await getBaseUrl();
-const inviteUrl = `${baseUrl}/invite/${token}`;
-if (typeof inviteUrl !== "string" || inviteUrl.includes("[object Promise]")) {
-  return NextResponse.json({ ok: false, error: "BAD_INVITE_URL" }, { status: 500 });
-}
+    const inviteUrl = `${baseUrl}/invite/${token}`;
+
+    if (typeof inviteUrl !== "string" || inviteUrl.includes("[object Promise]")) {
+      return NextResponse.json({ ok: false, error: "BAD_INVITE_URL" }, { status: 500 });
+    }
+
     console.log("[INVITES] baseUrl/inviteUrl:", { baseUrl, inviteUrl });
 
     let emailed = false;
@@ -232,7 +230,6 @@ if (typeof inviteUrl !== "string" || inviteUrl.includes("[object Promise]")) {
         hasResendKey: !!process.env.RESEND_API_KEY,
       });
 
-      // ✅ EMAIL: show tenant access window (from modules), not invite expiry
       await sendInviteEmail({
         to: email,
         inviteUrl,
@@ -256,7 +253,7 @@ if (typeof inviteUrl !== "string" || inviteUrl.includes("[object Promise]")) {
     return NextResponse.json({
       ok: true,
       inviteUrl,
-      expiresAt, // link expiry
+      expiresAt,
       emailed,
       emailError,
       ensuredUser: true,

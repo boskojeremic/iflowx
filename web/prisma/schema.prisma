@@ -14,19 +14,22 @@ model Tenant {
   createdAt           DateTime              @default(now())
   updatedAt           DateTime              @updatedAt
   isActive            Boolean               @default(true)
+
   apiKeys             ApiKey[]
   assets              Asset[]
   CalculatedResult    CalculatedResult[]
   results             EmissionResult[]
   emitters            Emitter[]
+  Site                Site[]
   Facility            Facility[]
-  FactorValue         FactorValue[]
   inputs              GHGInput[]
   invites             Invite[]
+  observations        Observation[]
   points              MeasurementPoint[]
   readings            MeasurementReading[]
   members             Membership[]
   ReportDayStatus     ReportDayStatus[]
+  ReportAssignment    ReportAssignment[]
   ReportRun           ReportRun[]
   periods             ReportingPeriod[]
   tenantIndustries    TenantIndustry[]
@@ -45,6 +48,7 @@ model User {
   membershipsCreated Membership[] @relation("MembershipCreatedBy")
   memberships        Membership[] @relation("MembershipUser")
   sessions           Session[]
+  ReportAssignment   ReportAssignment[]
 }
 
 model Membership {
@@ -88,21 +92,27 @@ model Invite {
 model Asset {
   id             String             @id @default(cuid())
   tenantId       String
+  facilityId     String
+  assetTypeId    String
+  parentAssetId  String?
+
   name           String
   code           String
   location       String?
+  observations   Observation[]
+  assetRole      AssetRole          @default(PROCESS)
+
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @updatedAt
-  assetRole      AssetRole          @default(PROCESS)
-  assetTypeId    String
-  facilityId     String
-  parentAssetId  String?
-  apiKeys        ApiKey[]
-  AssetType      AssetType          @relation(fields: [assetTypeId], references: [id])
-  Facility       Facility           @relation(fields: [facilityId], references: [id])
-  Asset          Asset?             @relation("AssetToAsset", fields: [parentAssetId], references: [id])
-  other_Asset    Asset[]            @relation("AssetToAsset")
+
   tenant         Tenant             @relation(fields: [tenantId], references: [id])
+  Facility       Facility           @relation(fields: [facilityId], references: [id])
+  AssetType      AssetType          @relation(fields: [assetTypeId], references: [id])
+
+  parentAsset    Asset?             @relation("AssetToAsset", fields: [parentAssetId], references: [id])
+  childAssets    Asset[]            @relation("AssetToAsset")
+
+  apiKeys        ApiKey[]
   AssetAttribute AssetAttribute[]
   AssetParameter AssetParameter[]
   results        EmissionResult[]
@@ -112,8 +122,8 @@ model Asset {
 
   @@unique([tenantId, code])
   @@index([tenantId])
-  @@index([assetTypeId])
   @@index([facilityId])
+  @@index([assetTypeId])
   @@index([parentAssetId])
 }
 
@@ -235,10 +245,8 @@ model MeasurementPoint {
   isActive   Boolean              @default(true)
   createdAt  DateTime             @default(now())
   updatedAt  DateTime             @updatedAt
-  facilityId String
   asset      Asset                @relation(fields: [assetId], references: [id])
   emitter    Emitter?             @relation(fields: [emitterId], references: [id])
-  Facility   Facility             @relation(fields: [facilityId], references: [id])
   tenant     Tenant               @relation(fields: [tenantId], references: [id])
   readings   MeasurementReading[]
 
@@ -246,8 +254,7 @@ model MeasurementPoint {
   @@index([tenantId])
   @@index([assetId])
   @@index([emitterId])
-  @@index([facilityId])
-}
+  }
 
 model MeasurementReading {
   id         String           @id @default(cuid())
@@ -397,11 +404,15 @@ model AssetParameter {
 }
 
 model AssetType {
-  id        String  @id
-  code      String  @unique
+  id        String            @id @default(cuid())
+  code      String            @unique
   name      String
-  isActive  Boolean @default(true)
-  sortOrder Int     @default(100)
+  category  AssetTypeCategory
+  isActive  Boolean           @default(true)
+  sortOrder Int               @default(100)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
   Asset     Asset[]
 }
 
@@ -426,52 +437,41 @@ model CalculatedResult {
 }
 
 model Facility {
-  id               String             @id
-  tenantId         String
-  name             String
-  code             String
-  location         String?
-  isActive         Boolean            @default(true)
-  createdAt        DateTime           @default(now())
-  updatedAt        DateTime
-  Asset            Asset[]
-  Tenant           Tenant             @relation(fields: [tenantId], references: [id])
-  FactorValue      FactorValue[]
-  MeasurementPoint MeasurementPoint[]
+  id        String    @id @default(cuid())
+  tenantId  String
+  siteId    String
+  name      String
+  code      String
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  Tenant    Tenant    @relation(fields: [tenantId], references: [id])
+  Site      Site      @relation(fields: [siteId], references: [id])
+  Asset     Asset[]
 
   @@unique([tenantId, code])
+  @@unique([siteId, code])
   @@index([tenantId])
+  @@index([siteId])
 }
 
-model FactorDefinition {
-  id          String        @id
-  key         String        @unique
-  name        String
-  defaultUnit String
-  description String?
-  isActive    Boolean       @default(true)
-  FactorValue FactorValue[]
-}
+model Site {
+  id        String    @id @default(cuid())
+  tenantId  String
+  name      String
+  code      String
+  country   String
+  city      String?
+  location  String?
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
-model FactorValue {
-  id               String           @id
-  factorId         String
-  methodologyId    String?
-  scopeType        FactorScopeType
-  tenantId         String?
-  facilityId       String?
-  value            Decimal          @db.Decimal(18, 6)
-  unit             String
-  effectiveFrom    DateTime?        @db.Date
-  effectiveTo      DateTime?        @db.Date
-  Facility         Facility?        @relation(fields: [facilityId], references: [id], onDelete: Cascade)
-  FactorDefinition FactorDefinition @relation(fields: [factorId], references: [id], onDelete: Cascade)
-  Methodology      Methodology?     @relation(fields: [methodologyId], references: [id])
-  Tenant           Tenant?          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  Tenant    Tenant    @relation(fields: [tenantId], references: [id])
+  Facility  Facility[]
 
-  @@index([facilityId])
-  @@index([factorId])
-  @@index([scopeType])
+  @@unique([tenantId, code])
   @@index([tenantId])
 }
 
@@ -524,35 +524,34 @@ model Methodology {
   code                String                @unique
   name                String
   isActive            Boolean               @default(true)
-  FactorValue         FactorValue[]
   Formula             Formula[]
   ReportMethodology   ReportMethodology[]
   TenantReportDefault TenantReportDefault[]
 }
 
 model Observation {
-  id          String    @id
+  id          String    @id @default(cuid())
   tenantId    String
-  facilityId  String
   assetId     String
-  emitterId   String
   parameterId String
   day         DateTime  @db.Date
   value       Decimal   @db.Decimal(18, 6)
   unit        String
   createdAt   DateTime  @default(now())
-  updatedAt   DateTime
-  Parameter   Parameter @relation(fields: [parameterId], references: [id])
+  updatedAt   DateTime  @updatedAt
 
-  @@unique([tenantId, emitterId, parameterId, day])
-  @@index([tenantId, assetId, day])
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  asset       Asset     @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  parameter   Parameter @relation(fields: [parameterId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, assetId, parameterId, day])
   @@index([tenantId, day])
-  @@index([tenantId, emitterId, parameterId, day])
-  @@index([tenantId, facilityId, day])
+  @@index([tenantId, assetId, day])
+  @@index([tenantId, parameterId, day])
 }
 
 model Parameter {
-  id                 String              @id
+  id                 String              @id @default(cuid())
   code               String              @unique @db.VarChar(64)
   name               String
   dataType           ParameterDataType
@@ -564,14 +563,16 @@ model Parameter {
   isActive           Boolean             @default(true)
   sortOrder          Int                 @default(100)
   createdAt          DateTime            @default(now())
-  updatedAt          DateTime
+  updatedAt          DateTime            @updatedAt
   groupId            String?
+
+  ParameterGroup     ParameterGroup?     @relation(fields: [groupId], references: [id])
+
   AssetParameter     AssetParameter[]
   CalculatedResult   CalculatedResult[]
   Formula            Formula[]
   MethodProfileItem  MethodProfileItem[]
   Observation        Observation[]
-  ParameterGroup     ParameterGroup?     @relation(fields: [groupId], references: [id])
   ParameterUnit      ParameterUnit[]
 
   @@index([groupId])
@@ -632,6 +633,7 @@ model ReportDefinition {
   ReportMethodology   ReportMethodology[]
   ReportRun           ReportRun[]
   TenantReportDefault TenantReportDefault[]
+  ReportAssignment    ReportAssignment[]
 
   @@unique([reportGroupId, code])
   @@index([reportGroupId])
@@ -696,6 +698,33 @@ model TenantReportDefault {
   @@unique([tenantId, reportId])
   @@index([reportId])
   @@index([tenantId])
+}
+
+model ReportAssignment {
+  id        String           @id @default(cuid())
+  tenantId   String
+  userId     String
+  reportId   String
+  role       ReportUserRole
+  isActive   Boolean         @default(true)
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+
+  tenant     Tenant          @relation(fields: [tenantId], references: [id])
+  user       User            @relation(fields: [userId], references: [id])
+  report     ReportDefinition @relation(fields: [reportId], references: [id])
+
+  @@unique([tenantId, userId, reportId])
+  @@index([tenantId])
+  @@index([userId])
+  @@index([reportId])
+}
+
+enum ReportUserRole {
+  CONTRIBUTOR
+  REVIEWER
+  APPROVER
+  VIEWER
 }
 
 enum MemberRole {
@@ -778,17 +807,18 @@ enum AssetRole {
   UTILITY
 }
 
+enum AssetTypeCategory {
+  STRUCTURAL
+  EQUIPMENT
+  UTILITY
+  INSTRUMENT
+}
+
 enum DayWorkflowStatus {
   DRAFT
   SUBMITTED
   APPROVED
   LOCKED
-}
-
-enum FactorScopeType {
-  PLATFORM
-  TENANT
-  FACILITY
 }
 
 enum FinalValueSource {

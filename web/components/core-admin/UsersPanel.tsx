@@ -62,13 +62,14 @@ function statusInTenant(u: UserRow, tenantId: string): "ACTIVE" | "INVITED" | nu
   return null;
 }
 
-async function postInvite(tenantId: string, email: string) {
+async function postInvite(tenantId: string, email: string, name?: string | null) {
   const r = await fetch("/api/admin/invites", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       tenantId,
       email,
+      name: name?.trim() || null,
       role: "ADMIN" as MemberRole,
     }),
   });
@@ -176,13 +177,12 @@ export default function UsersPanel() {
     }
   }
 
-  // ✅ helper: ensure user has correct type after create (works even if POST ignores "type")
+  // ensure user has correct type after create
   async function ensureType(userId: string, type: UserType, tenantId: string | null) {
     const res = await fetch(`/api/core-admin/users/${encodeURIComponent(userId)}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        // only type/tenantId here, don't touch name/email
         type,
         tenantId: type === "TENANT_ADMIN" ? tenantId : null,
       }),
@@ -197,6 +197,8 @@ export default function UsersPanel() {
 
   async function addUser() {
     const e = email.trim().toLowerCase();
+    const n = name.trim() || null;
+
     if (!e) return toast.error("EMAIL_REQUIRED");
 
     if (addType === "TENANT_ADMIN" && !selectedTenantId) {
@@ -212,7 +214,7 @@ export default function UsersPanel() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email: e,
-          name: name.trim() || null,
+          name: n,
           type: addType,
           tenantId: addType === "TENANT_ADMIN" ? selectedTenantId : null,
         }),
@@ -237,11 +239,9 @@ export default function UsersPanel() {
       const created = safeJson(text);
       const createdUser: UserRow | null = created?.user ?? null;
 
-      // reset inputs
       setEmail("");
       setName("");
 
-      // ✅ IMPORTANT: make sure type is set (in case your POST endpoint ignores it)
       if (createdUser?.id) {
         try {
           await ensureType(
@@ -258,10 +258,9 @@ export default function UsersPanel() {
         }
       }
 
-      // ✅ If TENANT_ADMIN -> send invite now (membership becomes INVITED and appears in tenant table)
       if (addType === "TENANT_ADMIN" && selectedTenantId) {
         try {
-          await postInvite(selectedTenantId, e);
+          await postInvite(selectedTenantId, e, n);
           toast.success(`User created + Invite sent (${selectedTenantLabel()})`);
         } catch (invErr: any) {
           const msg = invErr?.message ?? "INVITE_FAILED";
@@ -296,6 +295,8 @@ export default function UsersPanel() {
 
   async function saveEdit(id: string) {
     const e = editEmail.trim().toLowerCase();
+    const n = editName.trim() || null;
+
     if (!e) {
       setErr("EMAIL_REQUIRED");
       return toast.error("EMAIL_REQUIRED");
@@ -305,15 +306,13 @@ export default function UsersPanel() {
     const originalType: UserType = currentRow ? deriveType(currentRow) : "TENANT_ADMIN";
     const typeChanged = editType !== originalType;
 
-    // only require tenant when switching to TENANT_ADMIN
     if (typeChanged && editType === "TENANT_ADMIN" && !selectedTenantId) {
       setErr("TENANT_ID_REQUIRED");
       return toast.error("TENANT_ID_REQUIRED");
     }
 
-    // PATCH payload: always name/email; type only if changed
     const payload: any = {
-      name: editName.trim() || null,
+      name: n,
       email: e,
     };
     if (typeChanged) {
@@ -340,11 +339,9 @@ export default function UsersPanel() {
         return;
       }
 
-      // ✅ KEY RULE:
-      // If CORE -> TENANT, MUST go through invite flow (create INVITED membership + email)
       if (typeChanged && originalType === "CORE_ADMIN" && editType === "TENANT_ADMIN") {
         try {
-          await postInvite(selectedTenantId, e);
+          await postInvite(selectedTenantId, e, n);
           toast.success(`Saved + Invite sent (${selectedTenantLabel()})`);
         } catch (invErr: any) {
           const msg = invErr?.message ?? "INVITE_FAILED";
@@ -398,19 +395,20 @@ export default function UsersPanel() {
     }
 
     const targetEmail = (editingId === u.id ? editEmail : u.email).trim().toLowerCase();
+    const targetName =
+      editingId === u.id ? editName.trim() || null : u.name ?? null;
+
     if (!targetEmail) return toast.error("EMAIL_REQUIRED");
 
     const key = `${u.id}:${selectedTenantId}`;
 
-    // optimistic: show Invite Sent immediately
     setInviteSent((p) => ({ ...p, [key]: true }));
 
     setBusy(true);
     setErr(null);
     try {
-      await postInvite(selectedTenantId, targetEmail);
+      await postInvite(selectedTenantId, targetEmail, targetName);
 
-      // clear optimistic (status will come from DB on reload)
       setInviteSent((p) => {
         const n = { ...p };
         delete n[key];
@@ -420,7 +418,6 @@ export default function UsersPanel() {
       toast.success(`Invite sent (${selectedTenantLabel()})`);
       await loadUsers(true);
     } catch (e: any) {
-      // rollback optimistic
       setInviteSent((p) => {
         const n = { ...p };
         delete n[key];
@@ -455,9 +452,7 @@ export default function UsersPanel() {
         </div>
       ) : null}
 
-      {/* TOP BAR */}
       <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 space-y-4">
-        {/* ROW 1 – TENANT DD */}
         <div>
           <div className="mb-1 text-[11px] uppercase tracking-wider text-white/50">
             Tenant (filter + invite target)
@@ -480,9 +475,7 @@ export default function UsersPanel() {
           </select>
         </div>
 
-        {/* ROW 2 – INPUTS + ADMIN + ADD */}
         <div className="grid grid-cols-12 gap-3 items-end">
-          {/* FULL NAME */}
           <div className="col-span-3">
             <div className="mb-1 text-[11px] uppercase tracking-wider text-white/50">
               Full Name
@@ -497,7 +490,6 @@ export default function UsersPanel() {
             />
           </div>
 
-          {/* EMAIL */}
           <div className="col-span-4">
             <div className="mb-1 text-[11px] uppercase tracking-wider text-white/50">
               Email
@@ -512,7 +504,6 @@ export default function UsersPanel() {
             />
           </div>
 
-          {/* ADMIN TOGGLE */}
           <div className="col-span-3">
             <div className="mb-1 text-[11px] uppercase tracking-wider text-white/50">
               Admin
@@ -546,7 +537,6 @@ export default function UsersPanel() {
             </div>
           </div>
 
-          {/* ADD */}
           <div className="col-span-2 flex justify-end">
             <button
               onClick={addUser}
@@ -559,7 +549,6 @@ export default function UsersPanel() {
         </div>
       </div>
 
-      {/* CORE ADMINS */}
       <div className="rounded-xl border border-white/10 overflow-hidden">
         <div className="bg-white/[0.03] px-3 py-2 text-xs uppercase tracking-wider text-white/50">
           Core Admins
@@ -579,7 +568,6 @@ export default function UsersPanel() {
 
             return (
               <div key={u.id} className="grid grid-cols-12 gap-2 px-3 py-2 text-sm items-center">
-                {/* NAME */}
                 <div className="col-span-4 text-white/80">
                   {isEditing ? (
                     <input
@@ -604,7 +592,6 @@ export default function UsersPanel() {
                   )}
                 </div>
 
-                {/* EMAIL */}
                 <div className="col-span-4 text-white/80">
                   {isEditing ? (
                     <input
@@ -623,7 +610,6 @@ export default function UsersPanel() {
                   )}
                 </div>
 
-                {/* ADMIN (DD) */}
                 <div className="col-span-2 text-white/60">
                   {isEditing ? (
                     <select
@@ -647,7 +633,6 @@ export default function UsersPanel() {
                   )}
                 </div>
 
-                {/* ACTIONS */}
                 <div className="col-span-2 flex justify-end gap-2">
                   {isEditing ? (
                     <>
@@ -703,7 +688,6 @@ export default function UsersPanel() {
         </div>
       </div>
 
-      {/* TENANT USERS TABLE */}
       <div className="rounded-xl border border-white/10 overflow-hidden">
         <div className="bg-white/[0.03] px-3 py-2 text-xs uppercase tracking-wider text-white/50">
           Tenant Admins ({selectedTenantLabel()})
@@ -727,7 +711,6 @@ export default function UsersPanel() {
 
             return (
               <div key={u.id} className="grid grid-cols-12 gap-2 px-3 py-2 text-sm items-center">
-                {/* NAME */}
                 <div className="col-span-4 text-white/80">
                   {isEditing ? (
                     <input
@@ -752,7 +735,6 @@ export default function UsersPanel() {
                   )}
                 </div>
 
-                {/* EMAIL */}
                 <div className="col-span-4 text-white/80">
                   {isEditing ? (
                     <input
@@ -771,7 +753,6 @@ export default function UsersPanel() {
                   )}
                 </div>
 
-                {/* ADMIN */}
                 <div className="col-span-2 text-white/60">
                   {isEditing ? (
                     <select
@@ -788,7 +769,6 @@ export default function UsersPanel() {
                   )}
                 </div>
 
-                {/* ACTIONS */}
                 <div className="col-span-2 flex justify-end gap-2">
                   {isEditing ? (
                     <>
@@ -810,7 +790,6 @@ export default function UsersPanel() {
                     </>
                   ) : (
                     <>
-                      {/* Invite state UI */}
                       {st === "ACTIVE" ? (
                         <div className="h-9 px-3 flex items-center justify-center rounded-md border border-white/10 bg-transparent">
                           <span className="text-[12px] font-semibold tracking-wide text-emerald-300">

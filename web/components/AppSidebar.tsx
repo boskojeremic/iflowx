@@ -1,4 +1,3 @@
-// components/AppSidebar.tsx
 import AppSidebarHydrationSafe from "./AppSidebarHydrationSafe";
 import { getPortalNavForUserTenant } from "@/lib/portal-nav";
 
@@ -18,10 +17,14 @@ export default async function AppSidebar({
   tenantId,
   userId,
   showCoreAdmin,
+  showTenantAdmin,
+  showMasterDataAdmin,
 }: {
   tenantId: string | null;
   userId: string;
   showCoreAdmin: boolean;
+  showTenantAdmin: boolean;
+  showMasterDataAdmin: boolean;
 }) {
   const nav = tenantId ? await getPortalNavForUserTenant(userId, tenantId) : [];
 
@@ -39,5 +42,12 @@ export default async function AppSidebar({
     }))
     .filter((g) => g.items.length > 0);
 
-  return <AppSidebarHydrationSafe groups={groups} showCoreAdmin={showCoreAdmin} />;
+  return (
+    <AppSidebarHydrationSafe
+      groups={groups}
+      showCoreAdmin={showCoreAdmin}
+      showTenantAdmin={showTenantAdmin}
+      showMasterDataAdmin={showMasterDataAdmin}
+    />
+  );
 }

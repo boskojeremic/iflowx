@@ -3,9 +3,22 @@
 import * as React from "react";
 import Link from "next/link";
 import { signOut } from "next-auth/react";
-import { Home, LogOut, Settings, ShieldCheck } from "lucide-react";
-import { Package, Factory, Flame, BarChart3, Boxes, FileCheck } from "lucide-react";
-
+import {
+  Home,
+  LogOut,
+  Settings,
+  ShieldCheck,
+  Users,
+  Wrench,
+} from "lucide-react";
+import {
+  Package,
+  Factory,
+  Flame,
+  BarChart3,
+  Boxes,
+  FileCheck,
+} from "lucide-react";
 
 import {
   AlertDialog,
@@ -47,9 +60,9 @@ const moduleIcon = (code: string) => {
     case "REP":
       return <BarChart3 className="mr-2 h-4 w-4 shrink-0" />;
     case "HSE":
-      return <ShieldCheck className="mr-2 h-4 w-4 shrink-0" />; // ✅ HSE
+      return <ShieldCheck className="mr-2 h-4 w-4 shrink-0" />;
     case "ESG":
-      return <FileCheck className="mr-2 h-4 w-4 shrink-0" />; // ✅ ESG
+      return <FileCheck className="mr-2 h-4 w-4 shrink-0" />;
     default:
       return <Boxes className="mr-2 h-4 w-4 shrink-0" />;
   }
@@ -58,11 +71,18 @@ const moduleIcon = (code: string) => {
 export default function AppSidebarClient({
   groups,
   showCoreAdmin,
+  showTenantAdmin,
+  showMasterDataAdmin,
 }: {
   groups: SidebarGroupData[];
   showCoreAdmin: boolean;
+  showTenantAdmin: boolean;
+  showMasterDataAdmin: boolean;
 }) {
-  return (
+  const showAdminGroup =
+   showCoreAdmin || showTenantAdmin || showMasterDataAdmin;
+
+     return (
     <SidebarProvider>
       <Sidebar collapsible="icon" className="bg-sidebar text-sidebar-foreground">
         <SidebarHeader className="px-3 py-3">
@@ -76,35 +96,77 @@ export default function AppSidebarClient({
             <SidebarGroupContent>
               <SidebarMenu>
                 <SidebarMenuItem>
-  <SidebarMenuButton asChild className="w-full justify-start cursor-pointer uppercase tracking-wide">
-    <Link href="/home" className="flex items-center">
-      <Home className="mr-2 h-4 w-4" />
-      HOME
-    </Link>
-  </SidebarMenuButton>
-</SidebarMenuItem>
+                  <SidebarMenuButton
+                    asChild
+                    className="w-full justify-start cursor-pointer uppercase tracking-wide"
+                  >
+                    <Link href="/home" className="flex items-center">
+                      <Home className="mr-2 h-4 w-4" />
+                      HOME
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
 
-          {/* SUPER ADMIN */}
-          {showCoreAdmin && (
-            <SidebarGroup>
-              <SidebarGroupLabel>ADMIN</SidebarGroupLabel>
-              <SidebarGroupContent>
-                <SidebarMenu>
-                  <SidebarMenuItem>
-  <SidebarMenuButton asChild className="w-full justify-start cursor-pointer uppercase tracking-wide">
-    <Link href="/core-admin?tab=industry" className="flex items-center">
-      <Settings className="mr-2 h-4 w-4" />
-      CORE ADMIN
-    </Link>
-  </SidebarMenuButton>
-</SidebarMenuItem>
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
-          )}
+          {/* ADMIN */}
+{showAdminGroup && (
+  <SidebarGroup>
+    <SidebarGroupLabel>ADMIN</SidebarGroupLabel>
+    <SidebarGroupContent>
+      <SidebarMenu>
+        {showCoreAdmin && (
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              asChild
+              className="w-full justify-start cursor-pointer uppercase tracking-wide"
+            >
+              <Link
+                href="/core-admin?tab=industry"
+                className="flex items-center"
+              >
+                <Settings className="mr-2 h-4 w-4" />
+                CORE ADMIN
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        )}
+
+        {showTenantAdmin && (
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              asChild
+              className="w-full justify-start cursor-pointer uppercase tracking-wide"
+            >
+              <Link
+                href="/tenant-admin?tab=users"
+                className="flex items-center"
+              >
+                <Users className="mr-2 h-4 w-4" />
+                TENANT ADMIN
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        )}
+
+        {showMasterDataAdmin && (
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              asChild
+              className="w-full justify-start cursor-pointer uppercase tracking-wide"
+            >
+              <Link href="/master-data" className="flex items-center">
+                <Wrench className="mr-2 h-4 w-4" />
+                MASTER DATA ADMIN
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        )}
+      </SidebarMenu>
+    </SidebarGroupContent>
+  </SidebarGroup>
+)}
 
           {/* DYNAMIC GROUPS */}
           {groups.map((group) => (
@@ -115,16 +177,19 @@ export default function AppSidebarClient({
                   {group.items.map((item) => (
                     <SidebarMenuItem key={item.href}>
                       <SidebarMenuButton
-  asChild
-  className="w-full justify-start h-auto py-2"
->
-  <Link href={item.href} className="flex items-start gap-2 w-full">
-    {moduleIcon(item.code)}
-    <span className="whitespace-normal break-words leading-snug text-left">
-      {item.label}
-    </span>
-  </Link>
-</SidebarMenuButton>
+                        asChild
+                        className="w-full justify-start h-auto py-2"
+                      >
+                        <Link
+                          href={item.href}
+                          className="flex items-start gap-2 w-full"
+                        >
+                          {moduleIcon(item.code)}
+                          <span className="whitespace-normal break-words leading-snug text-left">
+                            {item.label}
+                          </span>
+                        </Link>
+                      </SidebarMenuButton>
                     </SidebarMenuItem>
                   ))}
                 </SidebarMenu>
@@ -133,16 +198,16 @@ export default function AppSidebarClient({
           ))}
         </SidebarContent>
 
-        {/* LOGOUT (dole) */}
+        {/* LOGOUT */}
         <SidebarFooter className="px-3 pb-3">
           <SidebarMenu>
             <SidebarMenuItem>
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <SidebarMenuButton className="w-full justify-start cursor-pointer uppercase tracking-wide">
-  <LogOut className="mr-2 h-4 w-4" />
-  LOGOUT
-</SidebarMenuButton>
+                    <LogOut className="mr-2 h-4 w-4" />
+                    LOGOUT
+                  </SidebarMenuButton>
                 </AlertDialogTrigger>
 
                 <AlertDialogContent className="bg-[#0b0f0d] border border-white/15 text-white shadow-2xl">

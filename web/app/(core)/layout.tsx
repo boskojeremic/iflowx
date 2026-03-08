@@ -14,29 +14,52 @@ export default async function CoreAppLayout({
     return <div style={{ padding: 24 }}>Not signed in</div>;
   }
 
-  // ✅ FIX: izaberi tenant membership pravilno (NULLS LAST)
-  const membership = await db.membership.findFirst({
-    where: { userId: user.id, status: "ACTIVE" },
+  const memberships = await db.membership.findMany({
+    where: {
+      userId: user.id,
+      status: "ACTIVE",
+    },
     orderBy: [
       { accessStartsAt: { sort: "desc", nulls: "last" } },
       { createdAt: "desc" },
     ],
-    select: { tenantId: true },
+    select: {
+      tenantId: true,
+      role: true,
+    },
   });
 
-  const tenantId = membership?.tenantId ?? null;
+  const tenantId = memberships[0]?.tenantId ?? null;
+
+  const showCoreAdmin = !!user.isSuperAdmin;
+
+  const isTenantAdmin = memberships.some(
+    (m) => m.role === "ADMIN" || m.role === "OWNER"
+  );
+
+  const isMasterDataAdmin = memberships.some(
+    (m) => m.role === "ADMIN" || m.role === "OWNER"
+  );
+
+  const showTenantAdmin = !user.isSuperAdmin && isTenantAdmin;
+  const showMasterDataAdmin = !user.isSuperAdmin && isMasterDataAdmin;
 
   const lic = await checkUserLicense(user.email);
 
   return (
-    <div className="min-h-screen flex">
-      <AppSidebar tenantId={tenantId} userId={user.id} showCoreAdmin={!!user.isSuperAdmin} />
+    <div className="h-screen flex overflow-hidden">
+      <AppSidebar
+        tenantId={tenantId}
+        userId={user.id}
+        showCoreAdmin={showCoreAdmin}
+        showTenantAdmin={showTenantAdmin}
+        showMasterDataAdmin={showMasterDataAdmin}
+      />
 
-      <main className="flex-1 min-w-0">
-        {/* header bar */}
+      <main className="flex-1 min-w-0 overflow-y-auto">
         <div className="h-14 px-6 flex items-center justify-end border-b">
           {!user.isSuperAdmin && lic && (
-            <div className="text-xs px-3 py-1 rounded-md border">
+            <div className="text-xs px-3 py-1 rounded-md border border-white/10 bg-white/[0.03]">
               License status: <b>{lic.active ? "ACTIVE" : "INACTIVE"}</b>
               {!lic.active && lic.reason ? (
                 <span className="ml-2 opacity-70">({lic.reason})</span>
@@ -45,9 +68,10 @@ export default async function CoreAppLayout({
           )}
         </div>
 
-        {/* centered content */}
         <div className="p-6 w-full">
-          <div className="mx-auto w-full max-w-6xl">{children}</div>
+          <div className="mx-auto w-full max-w-[1600px] px-4 sm:px-6 lg:px-8">
+            {children}
+          </div>
         </div>
       </main>
     </div>
