@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/authz";
+import { AssetTypeCategory } from "@prisma/client";
 
 async function ensureUser() {
   const user = await getCurrentUser();
@@ -12,6 +13,29 @@ async function ensureUser() {
   }
 
   return { user };
+}
+
+function isAssetTypeCategory(value: string): value is AssetTypeCategory {
+  return Object.values(AssetTypeCategory).includes(value as AssetTypeCategory);
+}
+
+export async function GET() {
+  const auth = await ensureUser();
+  if ("error" in auth) return auth.error;
+
+  const rows = await db.assetType.findMany({
+    orderBy: [{ sortOrder: "asc" }, { code: "asc" }],
+    select: {
+      id: true,
+      code: true,
+      name: true,
+      category: true,
+      sortOrder: true,
+      isActive: true,
+    },
+  });
+
+  return NextResponse.json({ rows });
 }
 
 export async function POST(req: Request) {
@@ -26,13 +50,32 @@ export async function POST(req: Request) {
 
   const code = String(body.code ?? "").trim().toUpperCase();
   const name = String(body.name ?? "").trim().toUpperCase();
-  const category = String(body.category ?? "").trim().toUpperCase();
+  const categoryRaw = String(body.category ?? "").trim().toUpperCase();
   const sortOrder = Number(body.sortOrder ?? 100) || 0;
 
-  if (!code || !name || !category) {
+  if (!code || !name || !categoryRaw) {
     return NextResponse.json(
       { error: "Code, Name, and Category are required." },
       { status: 400 }
+    );
+  }
+
+  if (!isAssetTypeCategory(categoryRaw)) {
+    return NextResponse.json(
+      { error: "Invalid Category value." },
+      { status: 400 }
+    );
+  }
+
+  const exists = await db.assetType.findUnique({
+    where: { code },
+    select: { id: true },
+  });
+
+  if (exists) {
+    return NextResponse.json(
+      { error: "Asset Type with this Code already exists." },
+      { status: 409 }
     );
   }
 
@@ -40,7 +83,7 @@ export async function POST(req: Request) {
     data: {
       code,
       name,
-      category,
+      category: categoryRaw,
       sortOrder,
       isActive: true,
     },
@@ -54,5 +97,5 @@ export async function POST(req: Request) {
     },
   });
 
-  return NextResponse.json({ ok: true, row });
+  return NextResponse.json({ ok: true, row }, { status: 201 });
 }

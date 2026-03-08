@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/authz";
+import { AssetTypeCategory } from "@prisma/client";
 
 async function ensureUser() {
   const user = await getCurrentUser();
@@ -12,6 +13,10 @@ async function ensureUser() {
   }
 
   return { user };
+}
+
+function isAssetTypeCategory(value: string): value is AssetTypeCategory {
+  return Object.values(AssetTypeCategory).includes(value as AssetTypeCategory);
 }
 
 export async function PATCH(
@@ -40,12 +45,19 @@ export async function PATCH(
 
   const code = String(body.code ?? "").trim().toUpperCase();
   const name = String(body.name ?? "").trim().toUpperCase();
-  const category = String(body.category ?? "").trim().toUpperCase();
+  const categoryRaw = String(body.category ?? "").trim().toUpperCase();
   const sortOrder = Number(body.sortOrder ?? 100) || 0;
 
-  if (!code || !name || !category) {
+  if (!code || !name || !categoryRaw) {
     return NextResponse.json(
       { error: "Code, Name, and Category are required." },
+      { status: 400 }
+    );
+  }
+
+  if (!isAssetTypeCategory(categoryRaw)) {
+    return NextResponse.json(
+      { error: "Invalid Category value." },
       { status: 400 }
     );
   }
@@ -55,7 +67,7 @@ export async function PATCH(
     data: {
       code,
       name,
-      category,
+      category: categoryRaw,
       sortOrder,
     },
     select: {
