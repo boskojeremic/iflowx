@@ -207,8 +207,8 @@ export default function AssetTypesClient({
   }
 
   return (
-    <div className="space-y-5">
-      <div className="space-y-1">
+    <div className="flex h-full min-h-0 flex-col gap-5">
+      <div className="shrink-0 space-y-1">
         <h1 className="text-2xl font-semibold tracking-tight">Asset Types</h1>
 
         <p className="text-sm text-white/60">
@@ -216,79 +216,84 @@ export default function AssetTypesClient({
         </p>
       </div>
 
-      <FormFrame title={isEditMode ? "Edit Asset Type" : "Add Asset Type"}>
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-          <div className="md:col-span-2">
-            <input
-              value={code}
-              onChange={(e) => setCode(upper(e.target.value))}
-              placeholder="Code"
-              disabled={busy}
-              className="h-10 w-full rounded-md border border-white/10 bg-white/[0.04] px-3 text-sm outline-none"
-            />
+      <div className="shrink-0">
+        <FormFrame title={isEditMode ? "Edit Asset Type" : "Add Asset Type"}>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-12">
+            <div className="md:col-span-2">
+              <input
+                value={code}
+                onChange={(e) => setCode(upper(e.target.value))}
+                placeholder="Code"
+                disabled={busy}
+                className="h-10 w-full rounded-md border border-white/10 bg-[#151a18] px-3 text-sm text-white outline-none"
+              />
+            </div>
+
+            <div className="md:col-span-4">
+              <input
+                value={name}
+                onChange={(e) => setName(upper(e.target.value))}
+                placeholder="Asset Type Name"
+                disabled={busy}
+                className="h-10 w-full rounded-md border border-white/10 bg-[#151a18] px-3 text-sm text-white outline-none"
+              />
+            </div>
+
+            <div className="md:col-span-3">
+              <select
+                value={category}
+                onChange={(e) => setCategory(e.target.value as AssetTypeCategory)}
+                disabled={busy}
+                className="h-10 w-full rounded-md border border-white/10 bg-[#151a18] px-3 text-sm text-white outline-none"
+              >
+                {categories.map((c) => (
+                  <option key={c} value={c}>
+                    {c.replaceAll("_", " ")}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="md:col-span-1">
+              <input
+                value={sortOrder}
+                onChange={(e) => setSortOrder(e.target.value)}
+                placeholder="Sort"
+                disabled={busy}
+                className="h-10 w-full rounded-md border border-white/10 bg-[#151a18] px-3 text-sm text-white outline-none"
+              />
+            </div>
+
+            <div className="md:col-span-2">
+              <button
+                onClick={() => (isEditMode ? updateAssetType() : addAssetType())}
+                disabled={busy}
+                className="h-10 w-full rounded-md bg-emerald-600 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+              >
+                {isEditMode ? "Save" : "Add"}
+              </button>
+            </div>
           </div>
 
-          <div className="md:col-span-4">
-            <input
-              value={name}
-              onChange={(e) => setName(upper(e.target.value))}
-              placeholder="Asset Type Name"
-              disabled={busy}
-              className="h-10 w-full rounded-md border border-white/10 bg-white/[0.04] px-3 text-sm outline-none"
-            />
-          </div>
+          {isEditMode && (
+            <div className="flex justify-end">
+              <button
+                onClick={resetForm}
+                disabled={busy}
+                className="h-10 rounded-md border border-white/15 bg-[#151a18] px-4 text-sm font-medium text-white hover:bg-[#1b211f] disabled:opacity-50"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+        </FormFrame>
+      </div>
 
-          <div className="md:col-span-3">
-            <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value as AssetTypeCategory)}
-              disabled={busy}
-              className="h-10 w-full rounded-md border border-white/10 bg-white/[0.04] px-3 text-sm outline-none"
-            >
-              {categories.map((c) => (
-                <option key={c} value={c}>
-                  {c.replaceAll("_", " ")}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="md:col-span-1">
-            <input
-              value={sortOrder}
-              onChange={(e) => setSortOrder(e.target.value)}
-              placeholder="Sort"
-              disabled={busy}
-              className="h-10 w-full rounded-md border border-white/10 bg-white/[0.04] px-3 text-sm outline-none"
-            />
-          </div>
-
-          <div className="md:col-span-2">
-            <button
-              onClick={() => (isEditMode ? updateAssetType() : addAssetType())}
-              disabled={busy}
-              className="h-10 w-full rounded-md bg-emerald-600 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
-            >
-              {isEditMode ? "Save" : "Add"}
-            </button>
-          </div>
-        </div>
-
-        {isEditMode && (
-          <div className="flex justify-end">
-            <button
-              onClick={resetForm}
-              disabled={busy}
-              className="h-10 rounded-md border border-white/15 bg-white/10 px-4 text-sm font-medium text-white hover:bg-white/15 disabled:opacity-50"
-            >
-              Cancel
-            </button>
-          </div>
-        )}
-      </FormFrame>
-
-      <TableFrame title="Asset Type List">
-        <div className="grid min-w-[1000px] grid-cols-12 gap-2 bg-white/[0.04] px-4 py-2 text-xs uppercase tracking-wider text-white/50">
+      <div className="flex-1">
+  <TableFrame title="Asset Type List">
+    <div className="max-h-[55vh] overflow-auto">
+      <div className="min-w-[1000px]">
+        <div className="sticky top-0 z-10 grid grid-cols-12 gap-2 border-b border-white/10 bg-[#101512] px-4 py-2 text-xs uppercase tracking-wider text-white/50">
           <div className="col-span-2">Code</div>
           <div className="col-span-4">Name</div>
           <div className="col-span-2">Category</div>
@@ -296,11 +301,11 @@ export default function AssetTypesClient({
           <div className="col-span-2 text-right">Actions</div>
         </div>
 
-        <div className="divide-y divide-white/10">
+        <div className="divide-y divide-white/10 bg-[#0b0f0d]">
           {rows.map((r) => (
             <div
               key={r.id}
-              className="grid min-w-[1000px] grid-cols-12 gap-2 px-4 py-3 text-sm items-center"
+              className="grid grid-cols-12 items-center gap-2 px-4 py-3 text-sm"
             >
               <div className="col-span-2">{r.code}</div>
               <div className="col-span-4">{r.name}</div>
@@ -339,7 +344,10 @@ export default function AssetTypesClient({
             </div>
           )}
         </div>
-      </TableFrame>
+      </div>
+    </div>
+  </TableFrame>
+</div>
     </div>
   );
 }

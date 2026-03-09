@@ -64,7 +64,7 @@ export default function MobileNavClient({
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-white/10 bg-white/[0.03]"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-white/10 bg-[#151a18]"
           aria-label="Open menu"
         >
           <Menu className="h-5 w-5" />
@@ -88,19 +88,19 @@ export default function MobileNavClient({
             open ? "translate-x-0" : "-translate-x-full"
           }`}
         >
-          <div className="flex h-14 items-center justify-between border-b border-white/10 px-3">
+          <div className="flex h-14 items-center justify-between border-b border-white/10 bg-[#0b0f0d] px-3">
             <div className="text-sm font-semibold tracking-wide">IFlowX</div>
             <button
               type="button"
               onClick={close}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-white/10 bg-white/[0.03]"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-white/10 bg-[#151a18]"
               aria-label="Close menu"
             >
               <X className="h-5 w-5" />
             </button>
           </div>
 
-          <div className="space-y-4 p-3">
+          <div className="space-y-4 bg-[#0b0f0d] p-3">
             <div className="space-y-2">
               <div className="text-[11px] font-semibold uppercase opacity-60">
                 General
@@ -109,7 +109,7 @@ export default function MobileNavClient({
               <Link
                 href="/home"
                 onClick={close}
-                className="flex items-center gap-2 rounded-md border border-white/10 bg-white/[0.02] px-3 py-2 text-sm"
+                className="flex items-center gap-2 rounded-md border border-white/10 bg-[#151a18] px-3 py-2 text-sm"
               >
                 <Home className="h-4 w-4" />
                 HOME
@@ -126,7 +126,7 @@ export default function MobileNavClient({
                   <Link
                     href="/core-admin?tab=industry"
                     onClick={close}
-                    className="flex items-center gap-2 rounded-md border border-white/10 bg-white/[0.02] px-3 py-2 text-sm"
+                    className="flex items-center gap-2 rounded-md border border-white/10 bg-[#151a18] px-3 py-2 text-sm"
                   >
                     <Settings className="h-4 w-4" />
                     CORE ADMIN
@@ -137,7 +137,7 @@ export default function MobileNavClient({
                   <Link
                     href="/tenant-admin?tab=users"
                     onClick={close}
-                    className="flex items-center gap-2 rounded-md border border-white/10 bg-white/[0.02] px-3 py-2 text-sm"
+                    className="flex items-center gap-2 rounded-md border border-white/10 bg-[#151a18] px-3 py-2 text-sm"
                   >
                     <Users className="h-4 w-4" />
                     TENANT ADMIN
@@ -148,7 +148,7 @@ export default function MobileNavClient({
                   <Link
                     href="/master-data"
                     onClick={close}
-                    className="flex items-center gap-2 rounded-md border border-white/10 bg-white/[0.02] px-3 py-2 text-sm"
+                    className="flex items-center gap-2 rounded-md border border-white/10 bg-[#151a18] px-3 py-2 text-sm"
                   >
                     <Wrench className="h-4 w-4" />
                     MASTER DATA ADMIN
@@ -169,7 +169,7 @@ export default function MobileNavClient({
                       key={item.href}
                       href={item.href}
                       onClick={close}
-                      className="flex items-start gap-2 rounded-md border border-white/10 bg-white/[0.02] px-3 py-2 text-sm"
+                      className="flex items-start gap-2 rounded-md border border-white/10 bg-[#151a18] px-3 py-2 text-sm"
                     >
                       {moduleIcon(item.code)}
                       <span className="leading-snug">{item.label}</span>
@@ -183,7 +183,7 @@ export default function MobileNavClient({
               <button
                 type="button"
                 onClick={() => signOut({ callbackUrl: "/login" })}
-                className="flex w-full items-center gap-2 rounded-md border border-white/10 bg-white/[0.02] px-3 py-2 text-sm"
+                className="flex w-full items-center gap-2 rounded-md border border-white/10 bg-[#151a18] px-3 py-2 text-sm"
               >
                 <LogOut className="h-4 w-4" />
                 LOGOUT

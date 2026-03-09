@@ -68,7 +68,7 @@ export default async function CoreAppLayout({
     .filter((g: any) => g.items.length > 0);
 
   return (
-    <div className="flex min-h-screen overflow-hidden">
+    <div className="flex h-screen overflow-hidden bg-[#07110d] text-white">
       <AppSidebar
         tenantId={tenantId}
         userId={user.id}
@@ -77,17 +77,19 @@ export default async function CoreAppLayout({
         showMasterDataAdmin={showMasterDataAdmin}
       />
 
-      <main className="flex-1 min-w-0 overflow-y-auto">
-        <MobileNavClient
-          groups={groups}
-          showCoreAdmin={showCoreAdmin}
-          showTenantAdmin={showTenantAdmin}
-          showMasterDataAdmin={showMasterDataAdmin}
-        />
+      <main className="flex h-screen flex-1 min-w-0 flex-col overflow-hidden bg-[#07110d]">
+        <div className="shrink-0 md:hidden">
+          <MobileNavClient
+            groups={groups}
+            showCoreAdmin={showCoreAdmin}
+            showTenantAdmin={showTenantAdmin}
+            showMasterDataAdmin={showMasterDataAdmin}
+          />
+        </div>
 
-        <div className="h-14 px-3 sm:px-4 md:px-6 flex items-center justify-end border-b">
+        <div className="flex h-14 shrink-0 items-center justify-end border-b border-white/10 bg-[#0b0f0d] px-3 sm:px-4 md:px-6">
           {!user.isSuperAdmin && lic && (
-            <div className="text-[11px] sm:text-xs px-2 sm:px-3 py-1 rounded-md border border-white/10 bg-white/[0.03]">
+            <div className="rounded-md border border-white/10 bg-[#151a18] px-2 py-1 text-[11px] sm:px-3 sm:text-xs">
               License status: <b>{lic.active ? "ACTIVE" : "INACTIVE"}</b>
               {!lic.active && lic.reason ? (
                 <span className="ml-2 opacity-70">({lic.reason})</span>
@@ -96,8 +98,8 @@ export default async function CoreAppLayout({
           )}
         </div>
 
-        <div className="w-full p-3 sm:p-4 md:p-6">
-          <div className="mx-auto w-full max-w-[1600px] px-0 sm:px-2 md:px-4 lg:px-8">
+        <div className="flex-1 overflow-hidden bg-[#07110d] p-3 sm:p-4 md:p-6">
+          <div className="mx-auto flex h-full w-full max-w-[1600px] flex-col px-0 sm:px-2 md:px-4 lg:px-8">
             {children}
           </div>
         </div>
