@@ -47,7 +47,7 @@ export default async function CoreAppLayout({
   const lic = await checkUserLicense(user.email);
 
   return (
-    <div className="h-screen flex overflow-hidden">
+    <div className="flex min-h-screen overflow-hidden bg-background">
       <AppSidebar
         tenantId={tenantId}
         userId={user.id}
@@ -56,10 +56,10 @@ export default async function CoreAppLayout({
         showMasterDataAdmin={showMasterDataAdmin}
       />
 
-      <main className="flex-1 min-w-0 overflow-y-auto">
-        <div className="h-14 px-6 flex items-center justify-end border-b">
+      <main className="min-w-0 flex-1 overflow-y-auto">
+        <div className="flex h-14 items-center justify-end border-b px-3 sm:px-4 md:px-6">
           {!user.isSuperAdmin && lic && (
-            <div className="text-xs px-3 py-1 rounded-md border border-white/10 bg-white/[0.03]">
+            <div className="max-w-full rounded-md border border-white/10 bg-white/[0.03] px-2 py-1 text-[11px] sm:px-3 sm:py-1 sm:text-xs">
               License status: <b>{lic.active ? "ACTIVE" : "INACTIVE"}</b>
               {!lic.active && lic.reason ? (
                 <span className="ml-2 opacity-70">({lic.reason})</span>
@@ -68,8 +68,8 @@ export default async function CoreAppLayout({
           )}
         </div>
 
-        <div className="p-6 w-full">
-          <div className="mx-auto w-full max-w-[1600px] px-4 sm:px-6 lg:px-8">
+        <div className="w-full p-3 sm:p-4 md:p-6">
+          <div className="mx-auto w-full max-w-[1600px] px-0 sm:px-2 md:px-4 lg:px-8">
             {children}
           </div>
         </div>

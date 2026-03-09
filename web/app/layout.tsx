@@ -1,13 +1,19 @@
 import "./globals.css";
-import { Toaster } from "sonner";
+import type { Viewport } from "next";
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+};
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body>
-        {children}
-        <Toaster richColors position="top-right" />
-      </body>
+      <body>{children}</body>
     </html>
   );
 }
