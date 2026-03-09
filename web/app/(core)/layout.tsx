@@ -2,7 +2,9 @@
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/authz";
 import { checkUserLicense } from "@/lib/license";
+import { getPortalNavForUserTenant } from "@/lib/portal-nav";
 import AppSidebar from "@/components/AppSidebar";
+import MobileNavClient from "@/components/MobileNavClient";
 
 export default async function CoreAppLayout({
   children,
@@ -10,6 +12,7 @@ export default async function CoreAppLayout({
   children: React.ReactNode;
 }) {
   const user = await getCurrentUser();
+
   if (!user) {
     return <div style={{ padding: 24 }}>Not signed in</div>;
   }
@@ -46,7 +49,25 @@ export default async function CoreAppLayout({
 
   const lic = await checkUserLicense(user.email);
 
-    return (
+  const nav = tenantId
+    ? await getPortalNavForUserTenant(user.id, tenantId)
+    : [];
+
+  const groups = nav
+    .map((g: any) => ({
+      key: String(g.industryCode ?? g.industryName ?? "IND"),
+      title: String(g.industryName ?? "Modules"),
+      items: (g.modules ?? [])
+        .filter((m: any) => !!m?.routePath)
+        .map((m: any) => ({
+          code: String(m.code ?? ""),
+          label: String(m.name ?? m.code ?? "Module"),
+          href: String(m.routePath),
+        })),
+    }))
+    .filter((g: any) => g.items.length > 0);
+
+  return (
     <div className="flex min-h-screen overflow-hidden">
       <AppSidebar
         tenantId={tenantId}
@@ -57,46 +78,12 @@ export default async function CoreAppLayout({
       />
 
       <main className="flex-1 min-w-0 overflow-y-auto">
-        <div className="md:hidden border-b px-3 py-2 bg-background sticky top-0 z-30">
-          <div className="flex items-center justify-between gap-2">
-            <div className="text-sm font-semibold">IFlowX</div>
-            <a
-              href="/home"
-              className="rounded border px-3 py-1 text-xs font-medium"
-            >
-              HOME
-            </a>
-          </div>
-
-          <div className="mt-2 flex flex-wrap gap-2">
-            {showCoreAdmin && (
-              <a
-                href="/core-admin?tab=industry"
-                className="rounded border px-3 py-1 text-xs"
-              >
-                CORE ADMIN
-              </a>
-            )}
-
-            {showTenantAdmin && (
-              <a
-                href="/tenant-admin?tab=users"
-                className="rounded border px-3 py-1 text-xs"
-              >
-                TENANT ADMIN
-              </a>
-            )}
-
-            {showMasterDataAdmin && (
-              <a
-                href="/master-data"
-                className="rounded border px-3 py-1 text-xs"
-              >
-                MASTER DATA
-              </a>
-            )}
-          </div>
-        </div>
+        <MobileNavClient
+          groups={groups}
+          showCoreAdmin={showCoreAdmin}
+          showTenantAdmin={showTenantAdmin}
+          showMasterDataAdmin={showMasterDataAdmin}
+        />
 
         <div className="h-14 px-3 sm:px-4 md:px-6 flex items-center justify-end border-b">
           {!user.isSuperAdmin && lic && (
@@ -109,7 +96,7 @@ export default async function CoreAppLayout({
           )}
         </div>
 
-        <div className="p-3 sm:p-4 md:p-6 w-full">
+        <div className="w-full p-3 sm:p-4 md:p-6">
           <div className="mx-auto w-full max-w-[1600px] px-0 sm:px-2 md:px-4 lg:px-8">
             {children}
           </div>
