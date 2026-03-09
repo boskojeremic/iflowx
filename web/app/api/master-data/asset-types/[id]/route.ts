@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/authz";
 import { AssetTypeCategory } from "@prisma/client";
 
-async function ensureUser() {
+async function getCurrentTenantContext() {
   const user = await getCurrentUser();
 
   if (!user) {
@@ -12,7 +12,33 @@ async function ensureUser() {
     };
   }
 
-  return { user };
+  const membership = await db.membership.findFirst({
+    where: {
+      userId: user.id,
+      status: "ACTIVE",
+    },
+    orderBy: [
+      { accessStartsAt: { sort: "desc", nulls: "last" } },
+      { createdAt: "desc" },
+    ],
+    select: {
+      tenantId: true,
+    },
+  });
+
+  if (!membership?.tenantId) {
+    return {
+      error: NextResponse.json(
+        { error: "No active tenant found." },
+        { status: 403 }
+      ),
+    };
+  }
+
+  return {
+    user,
+    tenantId: membership.tenantId,
+  };
 }
 
 function isAssetTypeCategory(value: string): value is AssetTypeCategory {
@@ -23,18 +49,24 @@ export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const auth = await ensureUser();
+  const auth = await getCurrentTenantContext();
   if ("error" in auth) return auth.error;
 
   const { id } = await params;
 
-  const existing = await db.assetType.findUnique({
-    where: { id },
-    select: { id: true },
+  const existing = await db.assetType.findFirst({
+    where: {
+      id,
+      tenantId: auth.tenantId,
+    },
+    select: { id: true, tenantId: true },
   });
 
   if (!existing) {
-    return NextResponse.json({ error: "Asset Type not found." }, { status: 404 });
+    return NextResponse.json(
+      { error: "Asset Type not found for current tenant." },
+      { status: 404 }
+    );
   }
 
   const body = await req.json().catch(() => null);
@@ -59,6 +91,24 @@ export async function PATCH(
     return NextResponse.json(
       { error: "Invalid Category value." },
       { status: 400 }
+    );
+  }
+
+  const duplicate = await db.assetType.findFirst({
+    where: {
+      tenantId: auth.tenantId,
+      code,
+      NOT: {
+        id,
+      },
+    },
+    select: { id: true },
+  });
+
+  if (duplicate) {
+    return NextResponse.json(
+      { error: "Another Asset Type with this Code already exists for current tenant." },
+      { status: 409 }
     );
   }
 
@@ -87,18 +137,24 @@ export async function DELETE(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const auth = await ensureUser();
+  const auth = await getCurrentTenantContext();
   if ("error" in auth) return auth.error;
 
   const { id } = await params;
 
-  const existing = await db.assetType.findUnique({
-    where: { id },
+  const existing = await db.assetType.findFirst({
+    where: {
+      id,
+      tenantId: auth.tenantId,
+    },
     select: { id: true },
   });
 
   if (!existing) {
-    return NextResponse.json({ error: "Asset Type not found." }, { status: 404 });
+    return NextResponse.json(
+      { error: "Asset Type not found for current tenant." },
+      { status: 404 }
+    );
   }
 
   await db.assetType.delete({

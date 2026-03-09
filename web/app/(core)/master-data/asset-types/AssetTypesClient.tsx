@@ -5,6 +5,8 @@ import { toast } from "sonner";
 import DeleteConfirm from "@/components/DeleteConfirm";
 import FormFrame from "@/components/ui/FormFrame";
 import TableFrame from "@/components/ui/TableFrame";
+import ClientPageShell from "@/components/ui/ClientPageShell";
+import ScrollTableArea from "@/components/ui/ScrollTableArea";
 
 type AssetTypeCategory =
   | "STRUCTURAL"
@@ -31,8 +33,12 @@ const categories: AssetTypeCategory[] = [
 ];
 
 export default function AssetTypesClient({
+  tenantName,
+  tenantCode,
   initialRows,
 }: {
+  tenantName: string;
+  tenantCode: string;
   initialRows: AssetTypeRow[];
 }) {
   const [rows, setRows] = useState<AssetTypeRow[]>(initialRows);
@@ -207,147 +213,148 @@ export default function AssetTypesClient({
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-5">
-      <div className="shrink-0 space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">Asset Types</h1>
-
-        <p className="text-sm text-white/60">
-          Define Standard Asset Type Catalog For Tenant Setup
-        </p>
-      </div>
-
-      <div className="shrink-0">
+    <ClientPageShell
+      title="Asset Types"
+      subtitle="Define Standard Asset Type Catalog For Tenant Setup"
+      form={
         <FormFrame title={isEditMode ? "Edit Asset Type" : "Add Asset Type"}>
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-12">
-            <div className="md:col-span-2">
-              <input
-                value={code}
-                onChange={(e) => setCode(upper(e.target.value))}
-                placeholder="Code"
-                disabled={busy}
-                className="h-10 w-full rounded-md border border-white/10 bg-[#151a18] px-3 text-sm text-white outline-none"
-              />
+          <div className="space-y-4">
+            <div className="text-xs uppercase tracking-wider text-white/40">
+              {tenantCode} · {tenantName}
             </div>
 
-            <div className="md:col-span-4">
-              <input
-                value={name}
-                onChange={(e) => setName(upper(e.target.value))}
-                placeholder="Asset Type Name"
-                disabled={busy}
-                className="h-10 w-full rounded-md border border-white/10 bg-[#151a18] px-3 text-sm text-white outline-none"
-              />
-            </div>
-
-            <div className="md:col-span-3">
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value as AssetTypeCategory)}
-                disabled={busy}
-                className="h-10 w-full rounded-md border border-white/10 bg-[#151a18] px-3 text-sm text-white outline-none"
-              >
-                {categories.map((c) => (
-                  <option key={c} value={c}>
-                    {c.replaceAll("_", " ")}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="md:col-span-1">
-              <input
-                value={sortOrder}
-                onChange={(e) => setSortOrder(e.target.value)}
-                placeholder="Sort"
-                disabled={busy}
-                className="h-10 w-full rounded-md border border-white/10 bg-[#151a18] px-3 text-sm text-white outline-none"
-              />
-            </div>
-
-            <div className="md:col-span-2">
-              <button
-                onClick={() => (isEditMode ? updateAssetType() : addAssetType())}
-                disabled={busy}
-                className="h-10 w-full rounded-md bg-emerald-600 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
-              >
-                {isEditMode ? "Save" : "Add"}
-              </button>
-            </div>
-          </div>
-
-          {isEditMode && (
-            <div className="flex justify-end">
-              <button
-                onClick={resetForm}
-                disabled={busy}
-                className="h-10 rounded-md border border-white/15 bg-[#151a18] px-4 text-sm font-medium text-white hover:bg-[#1b211f] disabled:opacity-50"
-              >
-                Cancel
-              </button>
-            </div>
-          )}
-        </FormFrame>
-      </div>
-
-      <div className="flex-1">
-  <TableFrame title="Asset Type List">
-    <div className="max-h-[55vh] overflow-auto">
-      <div className="min-w-[1000px]">
-        <div className="sticky top-0 z-10 grid grid-cols-12 gap-2 border-b border-white/10 bg-[#101512] px-4 py-2 text-xs uppercase tracking-wider text-white/50">
-          <div className="col-span-2">Code</div>
-          <div className="col-span-4">Name</div>
-          <div className="col-span-2">Category</div>
-          <div className="col-span-2">Sort</div>
-          <div className="col-span-2 text-right">Actions</div>
-        </div>
-
-        <div className="divide-y divide-white/10 bg-[#0b0f0d]">
-          {rows.map((r) => (
-            <div
-              key={r.id}
-              className="grid grid-cols-12 items-center gap-2 px-4 py-3 text-sm"
-            >
-              <div className="col-span-2">{r.code}</div>
-              <div className="col-span-4">{r.name}</div>
-              <div className="col-span-2">{r.category.replaceAll("_", " ")}</div>
-              <div className="col-span-2">{r.sortOrder}</div>
-
-              <div className="col-span-2 flex justify-end gap-2">
-                <button
-                  onClick={() => startEdit(r)}
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-12">
+              <div className="md:col-span-2">
+                <input
+                  value={code}
+                  onChange={(e) => setCode(upper(e.target.value))}
+                  placeholder="Code"
                   disabled={busy}
-                  className="h-9 rounded-md bg-blue-600 px-3 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-                >
-                  Edit
-                </button>
-
-                <DeleteConfirm
-                  title="Delete Asset Type?"
-                  description={`This will permanently delete "${r.name}".`}
-                  onConfirm={() => deleteAssetType(r.id, r.name)}
-                  trigger={
-                    <button
-                      disabled={busy}
-                      className="h-9 rounded-md bg-red-600 px-3 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
-                    >
-                      Delete
-                    </button>
-                  }
+                  className="h-10 w-full rounded-md border border-white/10 bg-[#151a18] px-3 text-sm text-white outline-none"
                 />
               </div>
-            </div>
-          ))}
 
-          {rows.length === 0 && (
-            <div className="px-4 py-4 text-sm text-white/50">
-              No Asset Types Defined.
+              <div className="md:col-span-4">
+                <input
+                  value={name}
+                  onChange={(e) => setName(upper(e.target.value))}
+                  placeholder="Asset Type Name"
+                  disabled={busy}
+                  className="h-10 w-full rounded-md border border-white/10 bg-[#151a18] px-3 text-sm text-white outline-none"
+                />
+              </div>
+
+              <div className="md:col-span-3">
+                <select
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value as AssetTypeCategory)}
+                  disabled={busy}
+                  className="h-10 w-full rounded-md border border-white/10 bg-[#151a18] px-3 text-sm text-white outline-none"
+                >
+                  {categories.map((c) => (
+                    <option key={c} value={c}>
+                      {c.replaceAll("_", " ")}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="md:col-span-1">
+                <input
+                  value={sortOrder}
+                  onChange={(e) => setSortOrder(e.target.value)}
+                  placeholder="Sort"
+                  disabled={busy}
+                  className="h-10 w-full rounded-md border border-white/10 bg-[#151a18] px-3 text-sm text-white outline-none"
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <button
+                  onClick={() => (isEditMode ? updateAssetType() : addAssetType())}
+                  disabled={busy}
+                  className="h-10 w-full rounded-md bg-emerald-600 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+                >
+                  {isEditMode ? "Save" : "Add"}
+                </button>
+              </div>
             </div>
-          )}
-        </div>
-      </div>
-    </div>
-  </TableFrame>
-</div>
-    </div>
+
+            {isEditMode && (
+              <div className="flex justify-end">
+                <button
+                  onClick={resetForm}
+                  disabled={busy}
+                  className="h-10 rounded-md border border-white/15 bg-[#151a18] px-4 text-sm font-medium text-white hover:bg-[#1b211f] disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
+          </div>
+        </FormFrame>
+      }
+      table={
+        <TableFrame title="Asset Type List">
+          <ScrollTableArea>
+            <div className="min-w-[1000px]">
+              <div className="sticky top-0 z-10 grid grid-cols-12 gap-2 border-b border-white/10 bg-[#101512] px-4 py-2 text-xs uppercase tracking-wider text-white/50">
+                <div className="col-span-2">Code</div>
+                <div className="col-span-4">Name</div>
+                <div className="col-span-2">Category</div>
+                <div className="col-span-2">Sort</div>
+                <div className="col-span-2 text-right">Actions</div>
+              </div>
+
+              <div className="divide-y divide-white/10 bg-[#0b0f0d]">
+                {rows.map((r) => (
+                  <div
+                    key={r.id}
+                    className="grid grid-cols-12 items-center gap-2 px-4 py-3 text-sm"
+                  >
+                    <div className="col-span-2">{r.code}</div>
+                    <div className="col-span-4">{r.name}</div>
+                    <div className="col-span-2">
+                      {r.category.replaceAll("_", " ")}
+                    </div>
+                    <div className="col-span-2">{r.sortOrder}</div>
+
+                    <div className="col-span-2 flex justify-end gap-2">
+                      <button
+                        onClick={() => startEdit(r)}
+                        disabled={busy}
+                        className="h-9 rounded-md bg-blue-600 px-3 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                      >
+                        Edit
+                      </button>
+
+                      <DeleteConfirm
+                        title="Delete Asset Type?"
+                        description={`This will permanently delete "${r.name}".`}
+                        onConfirm={() => deleteAssetType(r.id, r.name)}
+                        trigger={
+                          <button
+                            disabled={busy}
+                            className="h-9 rounded-md bg-red-600 px-3 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+                          >
+                            Delete
+                          </button>
+                        }
+                      />
+                    </div>
+                  </div>
+                ))}
+
+                {rows.length === 0 && (
+                  <div className="px-4 py-4 text-sm text-white/50">
+                    No Asset Types Defined.
+                  </div>
+                )}
+              </div>
+            </div>
+          </ScrollTableArea>
+        </TableFrame>
+      }
+    />
   );
 }

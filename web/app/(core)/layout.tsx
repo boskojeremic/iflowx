@@ -17,7 +17,7 @@ export default async function CoreAppLayout({
     return <div style={{ padding: 24 }}>Not signed in</div>;
   }
 
-  const memberships = await db.membership.findMany({
+  const membership = await db.membership.findFirst({
     where: {
       userId: user.id,
       status: "ACTIVE",
@@ -29,20 +29,24 @@ export default async function CoreAppLayout({
     select: {
       tenantId: true,
       role: true,
+      tenant: {
+        select: {
+          code: true,
+          name: true,
+        },
+      },
     },
   });
 
-  const tenantId = memberships[0]?.tenantId ?? null;
+  const tenantId = membership?.tenantId ?? null;
 
   const showCoreAdmin = !!user.isSuperAdmin;
 
-  const isTenantAdmin = memberships.some(
-    (m) => m.role === "ADMIN" || m.role === "OWNER"
-  );
+  const isTenantAdmin =
+    membership?.role === "ADMIN" || membership?.role === "OWNER";
 
-  const isMasterDataAdmin = memberships.some(
-    (m) => m.role === "ADMIN" || m.role === "OWNER"
-  );
+  const isMasterDataAdmin =
+    membership?.role === "ADMIN" || membership?.role === "OWNER";
 
   const showTenantAdmin = !user.isSuperAdmin && isTenantAdmin;
   const showMasterDataAdmin = !user.isSuperAdmin && isMasterDataAdmin;
@@ -67,6 +71,12 @@ export default async function CoreAppLayout({
     }))
     .filter((g: any) => g.items.length > 0);
 
+  const displayUser = user.name?.trim() || user.email;
+  const displayRole = user.isSuperAdmin ? "SUPERADMIN" : membership?.role ?? "-";
+  const displayTenant = membership?.tenant
+    ? `${membership.tenant.code} · ${membership.tenant.name}`
+    : "NO TENANT";
+
   return (
     <div className="flex min-h-screen md:h-screen overflow-hidden bg-[#07110d] text-white">
       <AppSidebar
@@ -87,15 +97,45 @@ export default async function CoreAppLayout({
           />
         </div>
 
-        <div className="flex h-14 shrink-0 items-center justify-end border-b border-white/10 bg-[#0b0f0d] px-3 sm:px-4 md:px-6">
-          {!user.isSuperAdmin && lic && (
-            <div className="rounded-md border border-white/10 bg-[#151a18] px-2 py-1 text-[11px] sm:px-3 sm:text-xs">
-              License status: <b>{lic.active ? "ACTIVE" : "INACTIVE"}</b>
-              {!lic.active && lic.reason ? (
-                <span className="ml-2 opacity-70">({lic.reason})</span>
-              ) : null}
+        <div className="flex h-14 shrink-0 items-center justify-end gap-2 border-b border-white/10 bg-[#0b0f0d] px-3 sm:px-4 md:px-6">
+          <div className="hidden md:flex items-center gap-2 text-[11px] sm:text-xs">
+            <div className="rounded-md border border-white/10 bg-[#151a18] px-3 py-1">
+              Tenant: <b>{displayTenant}</b>
             </div>
-          )}
+
+            <div className="rounded-md border border-white/10 bg-[#151a18] px-3 py-1">
+              User: <b>{displayUser}</b>
+            </div>
+
+            <div className="rounded-md border border-white/10 bg-[#151a18] px-3 py-1">
+              Role: <b>{displayRole}</b>
+            </div>
+
+            {!user.isSuperAdmin && lic && (
+              <div className="rounded-md border border-white/10 bg-[#151a18] px-3 py-1">
+                License status: <b>{lic.active ? "ACTIVE" : "INACTIVE"}</b>
+                {!lic.active && lic.reason ? (
+                  <span className="ml-2 opacity-70">({lic.reason})</span>
+                ) : null}
+              </div>
+            )}
+          </div>
+
+          <div className="flex md:hidden items-center gap-2 text-[11px]">
+            <div className="rounded-md border border-white/10 bg-[#151a18] px-2 py-1">
+              <b>{membership?.tenant?.code ?? "NO TENANT"}</b>
+            </div>
+
+            <div className="rounded-md border border-white/10 bg-[#151a18] px-2 py-1">
+              <b>{displayRole}</b>
+            </div>
+
+            {!user.isSuperAdmin && lic && (
+              <div className="rounded-md border border-white/10 bg-[#151a18] px-2 py-1">
+                <b>{lic.active ? "ACTIVE" : "INACTIVE"}</b>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="flex-1 overflow-visible md:overflow-hidden bg-[#07110d] p-3 sm:p-4 md:p-6">

@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/authz";
 import { AssetTypeCategory } from "@prisma/client";
 
-async function ensureUser() {
+async function getCurrentTenantContext() {
   const user = await getCurrentUser();
 
   if (!user) {
@@ -12,7 +12,33 @@ async function ensureUser() {
     };
   }
 
-  return { user };
+  const membership = await db.membership.findFirst({
+    where: {
+      userId: user.id,
+      status: "ACTIVE",
+    },
+    orderBy: [
+      { accessStartsAt: { sort: "desc", nulls: "last" } },
+      { createdAt: "desc" },
+    ],
+    select: {
+      tenantId: true,
+    },
+  });
+
+  if (!membership?.tenantId) {
+    return {
+      error: NextResponse.json(
+        { error: "No active tenant found." },
+        { status: 403 }
+      ),
+    };
+  }
+
+  return {
+    user,
+    tenantId: membership.tenantId,
+  };
 }
 
 function isAssetTypeCategory(value: string): value is AssetTypeCategory {
@@ -20,10 +46,13 @@ function isAssetTypeCategory(value: string): value is AssetTypeCategory {
 }
 
 export async function GET() {
-  const auth = await ensureUser();
+  const auth = await getCurrentTenantContext();
   if ("error" in auth) return auth.error;
 
   const rows = await db.assetType.findMany({
+    where: {
+      tenantId: auth.tenantId,
+    },
     orderBy: [{ sortOrder: "asc" }, { code: "asc" }],
     select: {
       id: true,
@@ -39,7 +68,7 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const auth = await ensureUser();
+  const auth = await getCurrentTenantContext();
   if ("error" in auth) return auth.error;
 
   const body = await req.json().catch(() => null);
@@ -67,20 +96,24 @@ export async function POST(req: Request) {
     );
   }
 
-  const exists = await db.assetType.findUnique({
-    where: { code },
+  const exists = await db.assetType.findFirst({
+    where: {
+      tenantId: auth.tenantId,
+      code,
+    },
     select: { id: true },
   });
 
   if (exists) {
     return NextResponse.json(
-      { error: "Asset Type with this Code already exists." },
+      { error: "Asset Type with this Code already exists for current tenant." },
       { status: 409 }
     );
   }
 
   const row = await db.assetType.create({
     data: {
+      tenantId: auth.tenantId,
       code,
       name,
       category: categoryRaw,
