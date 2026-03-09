@@ -64,7 +64,7 @@ export default function MobileNavClient({
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-md border"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-white/10 bg-white/[0.03]"
           aria-label="Open menu"
         >
           <Menu className="h-5 w-5" />
@@ -72,23 +72,26 @@ export default function MobileNavClient({
       </div>
 
       {open && (
-        <div className="fixed inset-0 z-50">
-          <div className="absolute inset-0 bg-black/50" onClick={close} />
+        <div className="fixed inset-0 z-50 md:hidden">
+          <div
+            className="absolute inset-0 bg-black/40 backdrop-blur-[2px] animate-in fade-in duration-200"
+            onClick={close}
+          />
 
-          <div className="absolute left-0 top-0 h-full w-[320px] max-w-[88vw] overflow-y-auto border-r bg-background shadow-xl">
-            <div className="flex h-14 items-center justify-between border-b px-3">
+          <div className="absolute left-0 top-0 h-full w-[320px] max-w-[88vw] overflow-y-auto border-r border-white/10 bg-sidebar text-sidebar-foreground shadow-2xl animate-in slide-in-from-left duration-300">
+            <div className="flex h-14 items-center justify-between border-b border-white/10 px-3">
               <div className="text-sm font-semibold tracking-wide">IFlowX</div>
               <button
                 type="button"
                 onClick={close}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-md border"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-white/10 bg-white/[0.03]"
                 aria-label="Close menu"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
 
-            <div className="p-3 space-y-4">
+            <div className="space-y-4 p-3">
               <div className="space-y-2">
                 <div className="text-[11px] font-semibold uppercase opacity-60">
                   General
@@ -97,7 +100,7 @@ export default function MobileNavClient({
                 <Link
                   href="/home"
                   onClick={close}
-                  className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm"
+                  className="flex items-center gap-2 rounded-md border border-white/10 bg-white/[0.02] px-3 py-2 text-sm"
                 >
                   <Home className="h-4 w-4" />
                   HOME
@@ -114,7 +117,7 @@ export default function MobileNavClient({
                     <Link
                       href="/core-admin?tab=industry"
                       onClick={close}
-                      className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm"
+                      className="flex items-center gap-2 rounded-md border border-white/10 bg-white/[0.02] px-3 py-2 text-sm"
                     >
                       <Settings className="h-4 w-4" />
                       CORE ADMIN
@@ -125,7 +128,7 @@ export default function MobileNavClient({
                     <Link
                       href="/tenant-admin?tab=users"
                       onClick={close}
-                      className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm"
+                      className="flex items-center gap-2 rounded-md border border-white/10 bg-white/[0.02] px-3 py-2 text-sm"
                     >
                       <Users className="h-4 w-4" />
                       TENANT ADMIN
@@ -136,7 +139,7 @@ export default function MobileNavClient({
                     <Link
                       href="/master-data"
                       onClick={close}
-                      className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm"
+                      className="flex items-center gap-2 rounded-md border border-white/10 bg-white/[0.02] px-3 py-2 text-sm"
                     >
                       <Wrench className="h-4 w-4" />
                       MASTER DATA ADMIN
@@ -157,7 +160,7 @@ export default function MobileNavClient({
                         key={item.href}
                         href={item.href}
                         onClick={close}
-                        className="flex items-start gap-2 rounded-md border px-3 py-2 text-sm"
+                        className="flex items-start gap-2 rounded-md border border-white/10 bg-white/[0.02] px-3 py-2 text-sm"
                       >
                         {moduleIcon(item.code)}
                         <span className="leading-snug">{item.label}</span>
@@ -171,7 +174,7 @@ export default function MobileNavClient({
                 <button
                   type="button"
                   onClick={() => signOut({ callbackUrl: "/login" })}
-                  className="flex w-full items-center gap-2 rounded-md border px-3 py-2 text-sm"
+                  className="flex w-full items-center gap-2 rounded-md border border-white/10 bg-white/[0.02] px-3 py-2 text-sm"
                 >
                   <LogOut className="h-4 w-4" />
                   LOGOUT
