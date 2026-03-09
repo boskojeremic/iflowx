@@ -16,7 +16,6 @@ export default function AppSidebarHydrationSafe({
   showMasterDataAdmin: boolean;
 }) {
   const [mounted, setMounted] = useState(false);
-  const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -30,8 +29,6 @@ export default function AppSidebarHydrationSafe({
       showCoreAdmin={showCoreAdmin}
       showTenantAdmin={showTenantAdmin}
       showMasterDataAdmin={showMasterDataAdmin}
-      mobileOpen={mobileOpen}
-      setMobileOpen={setMobileOpen}
     />
   );
 }
