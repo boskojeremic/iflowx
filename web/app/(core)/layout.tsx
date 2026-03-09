@@ -68,7 +68,7 @@ export default async function CoreAppLayout({
     .filter((g: any) => g.items.length > 0);
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[#07110d] text-white">
+    <div className="flex min-h-screen md:h-screen overflow-hidden bg-[#07110d] text-white">
       <AppSidebar
         tenantId={tenantId}
         userId={user.id}
@@ -77,7 +77,7 @@ export default async function CoreAppLayout({
         showMasterDataAdmin={showMasterDataAdmin}
       />
 
-      <main className="flex h-screen flex-1 min-w-0 flex-col overflow-hidden bg-[#07110d]">
+      <main className="flex min-h-screen md:h-screen flex-1 min-w-0 flex-col overflow-y-auto md:overflow-hidden bg-[#07110d]">
         <div className="shrink-0 md:hidden">
           <MobileNavClient
             groups={groups}
@@ -98,8 +98,8 @@ export default async function CoreAppLayout({
           )}
         </div>
 
-        <div className="flex-1 overflow-hidden bg-[#07110d] p-3 sm:p-4 md:p-6">
-          <div className="mx-auto flex h-full w-full max-w-[1600px] flex-col px-0 sm:px-2 md:px-4 lg:px-8">
+        <div className="flex-1 overflow-visible md:overflow-hidden bg-[#07110d] p-3 sm:p-4 md:p-6">
+          <div className="mx-auto flex w-full max-w-[1600px] flex-col md:h-full px-0 sm:px-2 md:px-4 lg:px-8">
             {children}
           </div>
         </div>
