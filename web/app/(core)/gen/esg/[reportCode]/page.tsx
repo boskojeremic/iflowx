@@ -89,7 +89,7 @@ export default async function ESGReportPage({
   const currentDay = todayYmd();
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6 min-h-full overflow-y-auto">
       {/* Breadcrumb */}
       <div className="text-sm text-white/50">
         <Link href="/gen/esg" className="hover:text-white/80 transition">
@@ -406,23 +406,31 @@ export default async function ESGReportPage({
         )}
 
         {tab === "report-view" && (
-          <div className="space-y-4">
-            <div>
-              <div className="text-xl font-semibold">Report View</div>
-              <div className="mt-1 text-sm text-white/60">
-                Final Presentation Layer For Review, Export, And Client Output
-              </div>
-            </div>
+  <div className="space-y-4">
+    <div>
+      <div className="text-xl font-semibold">Report View</div>
+      <div className="mt-1 text-sm text-white/60">
+        Final Presentation Layer For Review, Export, And Client Output
+      </div>
+    </div>
 
-            <div className="rounded-xl border border-white/10 bg-black/20 p-4">
-              <div className="font-medium">Final Report Output</div>
-              <div className="mt-3 text-sm text-white/60">
-                This Area Will Display The Final Report Layout, KPI Summary,
-                Tables, And Export-Ready Content.
-              </div>
-            </div>
-          </div>
-        )}
+    <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+      <div className="font-medium">Final Report Output</div>
+      <div className="mt-3 text-sm text-white/60">
+        Embedded GHG Emissions Inventory dashboard.
+      </div>
+
+      <div className="mt-4 h-[900px] overflow-auto rounded-xl border border-white/10 bg-[#06110d]">
+  <iframe
+    title="GHG Emissions Inventory ESG Report"
+    src="https://app.powerbi.com/reportEmbed?reportId=57dfe52d-a566-41dc-875d-167be01ee9c7&autoAuth=true&ctid=a69bf50c-65ed-4660-985b-04e1ffe59fdc&navContentPaneEnabled=false&pageNavigationPosition=none&filterPaneEnabled=false"
+    className="h-full w-full border-0"
+    allowFullScreen
+  />
+</div>
+    </div>
+  </div>
+)}
       </div>
     </div>
   );
