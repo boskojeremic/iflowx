@@ -6,12 +6,12 @@ export const runtime = "nodejs";
 
 export async function GET(
   _req: NextRequest,
-  { params }: { params: Promise<{ fileName: string }> }
+  { params }: { params: Promise<{ filename: string }> }
 ) {
   try {
-    const { fileName } = await params;
+    const { filename } = await params;
 
-    const safeFileName = String(fileName || "").replace(/[^a-zA-Z0-9._-]/g, "");
+    const safeFileName = String(filename || "").replace(/[^a-zA-Z0-9._-]/g, "");
     const filePath = path.join(process.cwd(), "generated", "fop", safeFileName);
 
     const fileBuffer = await fs.readFile(filePath);
