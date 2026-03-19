@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useSelectedTenant } from "@/hooks/useSelectedTenant";
 
 type Tenant = { id: string; name: string; code: string };
 
@@ -35,7 +36,9 @@ type TenantControlResponse = {
 
 function normalizeTenants(payload: any): Tenant[] {
   if (Array.isArray(payload)) return payload as Tenant[];
-  if (payload && typeof payload === "object" && Array.isArray(payload.tenants)) return payload.tenants as Tenant[];
+  if (payload && typeof payload === "object" && Array.isArray(payload.tenants)) {
+    return payload.tenants as Tenant[];
+  }
   return [];
 }
 
@@ -56,7 +59,6 @@ function daysLeft(isoEnd?: string | null) {
   return Math.ceil((end.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
 }
 
-// show ONLY if NOW is between start & end (both required)
 function isInPeriod(startsAt: string | null, endsAt: string | null) {
   const s = safeDate(startsAt);
   const e = safeDate(endsAt);
@@ -67,7 +69,10 @@ function isInPeriod(startsAt: string | null, endsAt: string | null) {
 
 export default function TenantControlPanel() {
   const [tenants, setTenants] = useState<Tenant[]>([]);
-  const [tenantId, setTenantId] = useState<string>("");
+  const {
+    selectedTenantId: tenantId,
+    setSelectedTenantId: setTenantId,
+  } = useSelectedTenant();
 
   const [tenant, setTenant] = useState<Tenant | null>(null);
   const [stats, setStats] = useState<TenantControlStats>({
@@ -84,28 +89,60 @@ export default function TenantControlPanel() {
   async function loadTenants() {
     const r = await fetch("/api/admin/tenants", { cache: "no-store" });
     const d = await r.json().catch(() => null);
-    if (!r.ok) throw new Error(d?.error ? String(d.error) : `TENANTS_HTTP_${r.status}`);
+
+    if (!r.ok) {
+      throw new Error(d?.error ? String(d.error) : `TENANTS_HTTP_${r.status}`);
+    }
 
     const list = normalizeTenants(d);
     setTenants(list);
-    if (!tenantId && list[0]?.id) setTenantId(list[0].id);
+
+    const savedTenantId =
+      typeof window !== "undefined"
+        ? localStorage.getItem("coreAdminSelectedTenantId")
+        : "";
+
+    if (savedTenantId && list.some((t) => t.id === savedTenantId)) {
+      setTenantId(savedTenantId);
+      return;
+    }
+
+    if (list[0]?.id) {
+      setTenantId(list[0].id);
+    }
   }
 
   async function loadTenantControl(tid: string) {
     setError("");
-    const r = await fetch(`/api/admin/tenant-control?tenantId=${encodeURIComponent(tid)}`, { cache: "no-store" });
+
+    const r = await fetch(
+      `/api/admin/tenant-control?tenantId=${encodeURIComponent(tid)}`,
+      { cache: "no-store" }
+    );
     const d: TenantControlResponse | null = await r.json().catch(() => null);
 
     if (!r.ok || !d?.ok) {
       setTenant(null);
-      setStats({ activeUsers: 0, invitedUsers: 0, activeAdmins: 0, invitedAdmins: 0 });
+      setStats({
+        activeUsers: 0,
+        invitedUsers: 0,
+        activeAdmins: 0,
+        invitedAdmins: 0,
+      });
       setIndustries([]);
       setError(d?.error ?? `TENANT_CONTROL_HTTP_${r.status}`);
       return;
     }
 
     setTenant(d.tenant ?? null);
-    setStats(d.stats ?? { activeUsers: 0, invitedUsers: 0, activeAdmins: 0, invitedAdmins: 0 });
+    setStats(
+      d.stats ?? {
+        activeUsers: 0,
+        invitedUsers: 0,
+        activeAdmins: 0,
+        invitedAdmins: 0,
+      }
+    );
     setIndustries(d.industries ?? []);
   }
 
@@ -133,11 +170,11 @@ export default function TenantControlPanel() {
         setLoading(false);
       }
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     if (!tenantId) return;
+
     (async () => {
       try {
         setLoading(true);
@@ -146,19 +183,28 @@ export default function TenantControlPanel() {
         setLoading(false);
       }
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenantId]);
 
   const industriesActiveOnly = useMemo(() => {
     const filtered = (industries ?? [])
       .map((g) => {
-        const ms = (g.modules ?? []).filter((m) => m.status === "ACTIVE" && isInPeriod(m.startsAt, m.endsAt));
+        const ms = (g.modules ?? []).filter(
+          (m) => m.status === "ACTIVE" && isInPeriod(m.startsAt, m.endsAt)
+        );
         return { ...g, modules: ms };
       })
       .filter((g) => g.modules.length > 0);
 
-    filtered.sort((a, b) => (a.industry.sortOrder ?? 0) - (b.industry.sortOrder ?? 0));
-    for (const g of filtered) g.modules.sort((a, b) => (a.module.sortOrder ?? 0) - (b.module.sortOrder ?? 0));
+    filtered.sort(
+      (a, b) => (a.industry.sortOrder ?? 0) - (b.industry.sortOrder ?? 0)
+    );
+
+    for (const g of filtered) {
+      g.modules.sort(
+        (a, b) => (a.module.sortOrder ?? 0) - (b.module.sortOrder ?? 0)
+      );
+    }
+
     return filtered;
   }, [industries]);
 
@@ -168,13 +214,13 @@ export default function TenantControlPanel() {
   }, [tenants, tenantId]);
 
   return (
-    // ✅ IMPORTANT: h-full + min-h-0 (flex children can scroll)
     <div className="w-full text-white flex flex-col h-full min-h-0 gap-4">
-      {/* HEADER */}
       <div className="flex items-center justify-between gap-4 shrink-0">
         <div>
           <h2 className="text-xl font-semibold">Tenant Control</h2>
-          <div className="text-sm text-white/60">Read-only licensing + tenant users overview (per module).</div>
+          <div className="text-sm text-white/60">
+            Read-only licensing + tenant users overview (per module).
+          </div>
         </div>
 
         <div className="flex items-center gap-3">
@@ -208,10 +254,11 @@ export default function TenantControlPanel() {
       </div>
 
       {error ? (
-        <div className="border border-red-500/30 bg-red-500/10 rounded p-3 text-sm shrink-0">{error}</div>
+        <div className="border border-red-500/30 bg-red-500/10 rounded p-3 text-sm shrink-0">
+          {error}
+        </div>
       ) : null}
 
-      {/* STATS (shrink-0) */}
       <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 shrink-0">
         <div className="flex items-start justify-between gap-4">
           <div className="text-sm text-white/70">Selected</div>
@@ -240,14 +287,12 @@ export default function TenantControlPanel() {
         </div>
       </div>
 
-      {/* ✅ MAIN AREA: takes remaining height, scroll happens inside */}
       <div className="flex-1 min-h-0">
         <div className="rounded-xl border border-white/10 overflow-hidden flex flex-col h-full">
           <div className="bg-white/[0.03] px-3 py-2 text-xs uppercase tracking-wider text-white/50 shrink-0">
             Modules & Licenses (per Industry)
           </div>
 
-          {/* ✅ ONLY THIS SCROLLS */}
           <div className="flex-1 min-h-0 overflow-y-auto">
             {loading ? (
               <div className="px-3 py-3 text-sm text-white/60">Loading…</div>
@@ -258,12 +303,20 @@ export default function TenantControlPanel() {
             ) : (
               <div className="space-y-3 p-3">
                 {industriesActiveOnly.map((g) => (
-                  <div key={g.industry.id} className="rounded-lg border border-white/10 overflow-hidden">
+                  <div
+                    key={g.industry.id}
+                    className="rounded-lg border border-white/10 overflow-hidden"
+                  >
                     <div className="flex items-center justify-between bg-white/[0.04] px-3 py-2">
                       <div className="text-sm font-semibold text-white/80">
-                        {g.industry.name} <span className="text-xs text-white/50">({g.industry.code})</span>
+                        {g.industry.name}{" "}
+                        <span className="text-xs text-white/50">
+                          ({g.industry.code})
+                        </span>
                       </div>
-                      <div className="text-xs text-white/50">{g.modules.length} modules</div>
+                      <div className="text-xs text-white/50">
+                        {g.modules.length} modules
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-12 gap-2 bg-white/[0.03] px-3 py-2 text-[11px] uppercase tracking-wider text-white/50">
@@ -280,15 +333,28 @@ export default function TenantControlPanel() {
                         const warn = dl !== null && dl < 15;
 
                         return (
-                          <div key={m.id} className="grid grid-cols-12 gap-2 px-3 py-2 text-sm items-center">
+                          <div
+                            key={m.id}
+                            className="grid grid-cols-12 gap-2 px-3 py-2 text-sm items-center"
+                          >
                             <div className="col-span-5">
-                              <div className="font-semibold text-white/85">{m.module.name}</div>
-                              <div className="text-[11px] text-white/45">{m.module.code}</div>
+                              <div className="font-semibold text-white/85">
+                                {m.module.name}
+                              </div>
+                              <div className="text-[11px] text-white/45">
+                                {m.module.code}
+                              </div>
                             </div>
 
-                            <div className="col-span-2 text-white/80">{m.seatLimit}</div>
-                            <div className="col-span-2 text-white/80">{fmtDate(m.startsAt)}</div>
-                            <div className="col-span-2 text-white/80">{fmtDate(m.endsAt)}</div>
+                            <div className="col-span-2 text-white/80">
+                              {m.seatLimit}
+                            </div>
+                            <div className="col-span-2 text-white/80">
+                              {fmtDate(m.startsAt)}
+                            </div>
+                            <div className="col-span-2 text-white/80">
+                              {fmtDate(m.endsAt)}
+                            </div>
 
                             <div className="col-span-1 text-right">
                               {dl === null ? (
@@ -299,7 +365,9 @@ export default function TenantControlPanel() {
                                   <span className="ml-1">!</span>
                                 </span>
                               ) : (
-                                <span className="font-semibold text-white/80">{dl}</span>
+                                <span className="font-semibold text-white/80">
+                                  {dl}
+                                </span>
                               )}
                             </div>
                           </div>
@@ -313,7 +381,8 @@ export default function TenantControlPanel() {
           </div>
 
           <div className="px-3 py-2 text-[11px] text-white/40 border-t border-white/10 shrink-0">
-            Rule: invited users/admins are not active. Modules are shown only if today is within license start/end. License warning: days left &lt; 15.
+            Rule: invited users/admins are not active. Modules are shown only if
+            today is within license start/end. License warning: days left &lt; 15.
           </div>
         </div>
       </div>

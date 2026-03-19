@@ -17,7 +17,7 @@ export default function TenantsPanel() {
   const [code, setCode] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-
+  
   const isEditMode = !!editingId;
   const upper = (v: string) => String(v ?? "").toUpperCase();
 

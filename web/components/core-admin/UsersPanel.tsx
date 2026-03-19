@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import DeleteConfirm from "@/components/DeleteConfirm";
+import { useSelectedTenant } from "@/hooks/useSelectedTenant";
 
 type UserType = "TENANT_ADMIN" | "CORE_ADMIN";
 type MemberRole = "OWNER" | "ADMIN" | "EDITOR" | "VIEWER";
@@ -35,8 +36,9 @@ function safeJson(text: string) {
 
 function normalizeTenants(payload: any): Tenant[] {
   if (Array.isArray(payload)) return payload as Tenant[];
-  if (payload && typeof payload === "object" && Array.isArray(payload.tenants))
+  if (payload && typeof payload === "object" && Array.isArray(payload.tenants)) {
     return payload.tenants as Tenant[];
+  }
   return [];
 }
 
@@ -44,22 +46,38 @@ function deriveType(u: UserRow): UserType {
   return u.isSuperAdmin ? "CORE_ADMIN" : "TENANT_ADMIN";
 }
 
-function hasMembershipInTenant(u: UserRow, tenantId: string) {
+function membershipInTenant(u: UserRow, tenantId: string) {
   const ms = u.memberships ?? [];
-  return ms.some(
-    (m) =>
-      m.tenantId === tenantId && (m.status === "ACTIVE" || m.status === "INVITED")
-  );
+  return ms.find((m) => m.tenantId === tenantId) ?? null;
 }
 
-function statusInTenant(u: UserRow, tenantId: string): "ACTIVE" | "INVITED" | null {
+function statusInTenant(
+  u: UserRow,
+  tenantId: string
+): "ACTIVE" | "INVITED" | null {
   if (!tenantId) return null;
-  const ms = u.memberships ?? [];
-  const m = ms.find((x) => x.tenantId === tenantId);
+  const m = membershipInTenant(u, tenantId);
   if (!m) return null;
   if (m.status === "ACTIVE") return "ACTIVE";
   if (m.status === "INVITED") return "INVITED";
   return null;
+}
+
+function splitName(fullName: string | null | undefined) {
+  const clean = String(fullName ?? "").trim().replace(/\s+/g, " ");
+  if (!clean) return { firstName: "", lastName: "" };
+
+  const parts = clean.split(" ");
+  if (parts.length === 1) return { firstName: parts[0], lastName: "" };
+
+  return {
+    firstName: parts.slice(0, -1).join(" "),
+    lastName: parts.slice(-1).join(""),
+  };
+}
+
+function joinName(firstName: string, lastName: string) {
+  return [firstName.trim(), lastName.trim()].filter(Boolean).join(" ").trim();
 }
 
 async function postInvite(tenantId: string, email: string, name?: string | null) {
@@ -83,24 +101,23 @@ export default function UsersPanel() {
   const [rows, setRows] = useState<UserRow[]>([]);
   const [tenants, setTenants] = useState<Tenant[]>([]);
 
-  // Tenant filter + invite target
-  const [selectedTenantId, setSelectedTenantId] = useState<string>("");
+const { selectedTenantId, setSelectedTenantId: setTenantId } = useSelectedTenant();
 
-  // Add form
   const [email, setEmail] = useState("");
-  const [name, setName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [addType, setAddType] = useState<UserType>("TENANT_ADMIN");
 
-  // Common
+  const [search, setSearch] = useState("");
+
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  // Optimistic Invite Sent flags (userId:tenantId)
   const [inviteSent, setInviteSent] = useState<Record<string, boolean>>({});
 
-  // Edit row
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editName, setEditName] = useState("");
+  const [editFirstName, setEditFirstName] = useState("");
+  const [editLastName, setEditLastName] = useState("");
   const [editEmail, setEditEmail] = useState("");
   const [editType, setEditType] = useState<UserType>("TENANT_ADMIN");
 
@@ -109,14 +126,33 @@ export default function UsersPanel() {
     [editingId, rows]
   );
 
-  // CORE ADMINS always visible
   const coreAdmins = useMemo(() => rows.filter((u) => u.isSuperAdmin), [rows]);
 
-  // Tenant users only for selected tenant (exclude core admins)
   const tenantAdmins = useMemo(() => {
     if (!selectedTenantId) return [];
-    return rows.filter((u) => !u.isSuperAdmin && hasMembershipInTenant(u, selectedTenantId));
-  }, [rows, selectedTenantId]);
+
+    const base = rows.filter((u) => {
+      if (u.isSuperAdmin) return false;
+      const m = membershipInTenant(u, selectedTenantId);
+      if (!m) return false;
+
+      return (
+        (m.status === "ACTIVE" || m.status === "INVITED") &&
+        (m.role === "OWNER" || m.role === "ADMIN")
+      );
+    });
+
+    const q = search.trim().toLowerCase();
+    if (!q) return base;
+
+    return base.filter((u) => {
+      const m = membershipInTenant(u, selectedTenantId);
+      return [u.name ?? "", u.email ?? "", m?.role ?? "", m?.status ?? ""]
+        .join(" ")
+        .toLowerCase()
+        .includes(q);
+    });
+  }, [rows, selectedTenantId, search]);
 
   function selectedTenantLabel() {
     const t = tenants.find((x) => x.id === selectedTenantId);
@@ -124,24 +160,36 @@ export default function UsersPanel() {
   }
 
   async function loadTenants(silent?: boolean) {
-    try {
-      const r = await fetch("/api/admin/tenants", { cache: "no-store" });
-      const d = await r.json().catch(() => null);
+  try {
+    const r = await fetch("/api/admin/tenants", { cache: "no-store" });
+    const d = await r.json().catch(() => null);
 
-      if (!r.ok) {
-        const msg = d?.error ? String(d.error) : `TENANTS_HTTP_${r.status}`;
-        if (!silent) toast.error(msg);
-        return;
-      }
-
-      const list = normalizeTenants(d);
-      setTenants(list);
-
-      if (!selectedTenantId && list[0]?.id) setSelectedTenantId(list[0].id);
-    } catch {
-      // ignore
+    if (!r.ok) {
+      const msg = d?.error ? String(d.error) : `TENANTS_HTTP_${r.status}`;
+      if (!silent) toast.error(msg);
+      return;
     }
+
+    const list = normalizeTenants(d);
+    setTenants(list);
+
+    const savedTenantId =
+      typeof window !== "undefined"
+        ? localStorage.getItem("coreAdminSelectedTenantId")
+        : "";
+
+    if (savedTenantId && list.some((t) => t.id === savedTenantId)) {
+      setTenantId(savedTenantId);
+      return;
+    }
+
+    if (list[0]?.id) {
+      setTenantId(list[0].id);
+    }
+  } catch {
+    // ignore
   }
+}
 
   async function loadUsers(silent?: boolean) {
     if (!silent) setErr(null);
@@ -157,7 +205,6 @@ export default function UsersPanel() {
         const msg = j?.error ? `${j.error}` : `USERS_API_${res.status}`;
         setErr(msg);
         if (!silent) toast.error(msg);
-        console.error(text);
         return;
       }
 
@@ -166,7 +213,6 @@ export default function UsersPanel() {
         const msg = "USERS_API_NOT_JSON";
         setErr(msg);
         if (!silent) toast.error(msg);
-        console.error(text);
         return;
       }
 
@@ -177,7 +223,6 @@ export default function UsersPanel() {
     }
   }
 
-  // ensure user has correct type after create
   async function ensureType(userId: string, type: UserType, tenantId: string | null) {
     const res = await fetch(`/api/core-admin/users/${encodeURIComponent(userId)}`, {
       method: "PATCH",
@@ -197,8 +242,10 @@ export default function UsersPanel() {
 
   async function addUser() {
     const e = email.trim().toLowerCase();
-    const n = name.trim() || null;
+    const n = joinName(firstName, lastName) || null;
 
+    if (!firstName.trim()) return toast.error("FIRST_NAME_REQUIRED");
+    if (!lastName.trim()) return toast.error("SECOND_NAME_REQUIRED");
     if (!e) return toast.error("EMAIL_REQUIRED");
 
     if (addType === "TENANT_ADMIN" && !selectedTenantId) {
@@ -232,7 +279,6 @@ export default function UsersPanel() {
               : `ADD_USER_${res.status}`;
         setErr(msg);
         toast.error(msg);
-        console.error(text);
         return;
       }
 
@@ -240,7 +286,8 @@ export default function UsersPanel() {
       const createdUser: UserRow | null = created?.user ?? null;
 
       setEmail("");
-      setName("");
+      setFirstName("");
+      setLastName("");
 
       if (createdUser?.id) {
         try {
@@ -280,7 +327,10 @@ export default function UsersPanel() {
   function startEdit(u: UserRow) {
     setErr(null);
     setEditingId(u.id);
-    setEditName(u.name ?? "");
+
+    const parts = splitName(u.name);
+    setEditFirstName(parts.firstName);
+    setEditLastName(parts.lastName);
     setEditEmail(u.email ?? "");
     setEditType(deriveType(u));
   }
@@ -288,14 +338,25 @@ export default function UsersPanel() {
   function cancelEdit() {
     setErr(null);
     setEditingId(null);
-    setEditName("");
+    setEditFirstName("");
+    setEditLastName("");
     setEditEmail("");
     setEditType("TENANT_ADMIN");
   }
 
   async function saveEdit(id: string) {
     const e = editEmail.trim().toLowerCase();
-    const n = editName.trim() || null;
+    const n = joinName(editFirstName, editLastName) || null;
+
+    if (!editFirstName.trim()) {
+      setErr("FIRST_NAME_REQUIRED");
+      return toast.error("FIRST_NAME_REQUIRED");
+    }
+
+    if (!editLastName.trim()) {
+      setErr("SECOND_NAME_REQUIRED");
+      return toast.error("SECOND_NAME_REQUIRED");
+    }
 
     if (!e) {
       setErr("EMAIL_REQUIRED");
@@ -315,6 +376,7 @@ export default function UsersPanel() {
       name: n,
       email: e,
     };
+
     if (typeChanged) {
       payload.type = editType;
       payload.tenantId = editType === "TENANT_ADMIN" ? selectedTenantId : null;
@@ -335,7 +397,6 @@ export default function UsersPanel() {
         const msg = j?.error ? `${j.error}` : `EDIT_USER_${res.status}`;
         setErr(msg);
         toast.error(msg);
-        console.error(text);
         return;
       }
 
@@ -373,7 +434,6 @@ export default function UsersPanel() {
         const msg = j?.error ? `${j.error}` : `DELETE_USER_${res.status}`;
         setErr(msg);
         toast.error(msg);
-        console.error(text);
         return;
       }
 
@@ -396,7 +456,9 @@ export default function UsersPanel() {
 
     const targetEmail = (editingId === u.id ? editEmail : u.email).trim().toLowerCase();
     const targetName =
-      editingId === u.id ? editName.trim() || null : u.name ?? null;
+      editingId === u.id
+        ? joinName(editFirstName, editLastName) || null
+        : u.name ?? null;
 
     if (!targetEmail) return toast.error("EMAIL_REQUIRED");
 
@@ -437,13 +499,12 @@ export default function UsersPanel() {
       await loadTenants(true);
       await loadUsers(true);
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
     <div className="space-y-4">
       <div className="text-sm text-white/70">
-        Tenant-filtered Users. Invite always targets the selected Tenant.
+        Tenant-filtered users. Invite always targets the selected tenant.
       </div>
 
       {err ? (
@@ -460,7 +521,7 @@ export default function UsersPanel() {
           <select
             className="h-10 w-full rounded-md border border-white/10 bg-white/[0.04] px-3 text-sm text-white/80 outline-none"
             value={selectedTenantId}
-            onChange={(e) => setSelectedTenantId(e.target.value)}
+onChange={(e) => setTenantId(e.target.value)}
             disabled={busy || tenants.length === 0}
           >
             {tenants.length === 0 ? (
@@ -476,15 +537,29 @@ export default function UsersPanel() {
         </div>
 
         <div className="grid grid-cols-12 gap-3 items-end">
-          <div className="col-span-3">
+          <div className="col-span-2">
             <div className="mb-1 text-[11px] uppercase tracking-wider text-white/50">
-              Full Name
+              First Name
             </div>
             <input
               className="h-10 w-full rounded-md border border-white/10 bg-white/[0.04] px-3 text-sm outline-none"
-              placeholder="Full Name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
+              placeholder="First Name"
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && addUser()}
+              disabled={busy}
+            />
+          </div>
+
+          <div className="col-span-2">
+            <div className="mb-1 text-[11px] uppercase tracking-wider text-white/50">
+              Second Name
+            </div>
+            <input
+              className="h-10 w-full rounded-md border border-white/10 bg-white/[0.04] px-3 text-sm outline-none"
+              placeholder="Second Name"
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && addUser()}
               disabled={busy}
             />
@@ -504,11 +579,11 @@ export default function UsersPanel() {
             />
           </div>
 
-          <div className="col-span-3">
+          <div className="col-span-2">
             <div className="mb-1 text-[11px] uppercase tracking-wider text-white/50">
-              Admin
+              Type
             </div>
-            <div className="flex h-10 min-w-[220px] overflow-hidden rounded-md border border-white/10 bg-white/[0.04]">
+            <div className="flex h-10 overflow-hidden rounded-md border border-white/10 bg-white/[0.04]">
               <button
                 type="button"
                 onClick={() => setAddType("TENANT_ADMIN")}
@@ -557,31 +632,34 @@ export default function UsersPanel() {
         <div className="grid grid-cols-12 gap-2 bg-white/[0.04] px-3 py-2 text-xs uppercase tracking-wider text-white/50">
           <div className="col-span-4">Name</div>
           <div className="col-span-4">Email</div>
-          <div className="col-span-2">Admin</div>
+          <div className="col-span-2">Type</div>
           <div className="col-span-2 text-right">Actions</div>
         </div>
 
-        <div className="divide-y divide-white/10">
+        <div className="max-h-[220px] overflow-y-auto divide-y divide-white/10">
           {coreAdmins.map((u) => {
             const isEditing = editingId === u.id;
-            const shownType = isEditing ? editType : deriveType(u);
-
             return (
               <div key={u.id} className="grid grid-cols-12 gap-2 px-3 py-2 text-sm items-center">
                 <div className="col-span-4 text-white/80">
                   {isEditing ? (
-                    <input
-                      className="w-full rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm outline-none"
-                      value={editName}
-                      onChange={(e) => setEditName(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") saveEdit(u.id);
-                        if (e.key === "Escape") cancelEdit();
-                      }}
-                      placeholder="Full name"
-                      disabled={busy}
-                      autoFocus
-                    />
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        className="w-full rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm outline-none"
+                        value={editFirstName}
+                        onChange={(e) => setEditFirstName(e.target.value)}
+                        disabled={busy}
+                        autoFocus
+                        placeholder="First Name"
+                      />
+                      <input
+                        className="w-full rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm outline-none"
+                        value={editLastName}
+                        onChange={(e) => setEditLastName(e.target.value)}
+                        disabled={busy}
+                        placeholder="Second Name"
+                      />
+                    </div>
                   ) : (
                     <div className="flex items-center gap-2">
                       <span className="truncate">{u.name ?? "-"}</span>
@@ -598,12 +676,8 @@ export default function UsersPanel() {
                       className="w-full rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm outline-none"
                       value={editEmail}
                       onChange={(e) => setEditEmail(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") saveEdit(u.id);
-                        if (e.key === "Escape") cancelEdit();
-                      }}
-                      placeholder="email@company.com"
                       disabled={busy}
+                      placeholder="email@company.com"
                     />
                   ) : (
                     <div className="truncate">{u.email}</div>
@@ -617,11 +691,6 @@ export default function UsersPanel() {
                       value={editType}
                       onChange={(e) => setEditType(e.target.value as UserType)}
                       disabled={busy}
-                      title={
-                        !selectedTenantId
-                          ? "Select tenant first (needed for TENANT admin)"
-                          : "Select admin type"
-                      }
                     >
                       <option value="TENANT_ADMIN" disabled={!selectedTenantId}>
                         TENANT
@@ -629,7 +698,7 @@ export default function UsersPanel() {
                       <option value="CORE_ADMIN">CORE</option>
                     </select>
                   ) : (
-                    <div className="truncate">{shownType === "CORE_ADMIN" ? "CORE" : "TENANT"}</div>
+                    <div className="truncate">CORE</div>
                   )}
                 </div>
 
@@ -640,7 +709,6 @@ export default function UsersPanel() {
                         onClick={() => saveEdit(u.id)}
                         disabled={busy || (editType === "TENANT_ADMIN" && !selectedTenantId)}
                         className="h-9 rounded-md bg-blue-600 px-4 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-                        title={editType === "TENANT_ADMIN" && !selectedTenantId ? "Select tenant first" : "Save"}
                       >
                         Save
                       </button>
@@ -693,19 +761,28 @@ export default function UsersPanel() {
           Tenant Admins ({selectedTenantLabel()})
         </div>
 
+        <div className="px-3 py-3 border-b border-white/10 bg-white/[0.02]">
+          <input
+            className="h-10 w-full rounded-md border border-white/10 bg-white/[0.04] px-3 text-sm outline-none"
+            placeholder="Search tenant admins by name, email, role or status"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            disabled={busy}
+          />
+        </div>
+
         <div className="grid grid-cols-12 gap-2 bg-white/[0.04] px-3 py-2 text-xs uppercase tracking-wider text-white/50">
           <div className="col-span-4">Name</div>
           <div className="col-span-4">Email</div>
-          <div className="col-span-2">Admin</div>
+          <div className="col-span-2">Role</div>
           <div className="col-span-2 text-right">Actions</div>
         </div>
 
-        <div className="divide-y divide-white/10">
+        <div className="max-h-[420px] overflow-y-auto divide-y divide-white/10">
           {tenantAdmins.map((u) => {
             const isEditing = editingId === u.id;
-            const shownType = isEditing ? editType : deriveType(u);
-
             const st = statusInTenant(u, selectedTenantId);
+            const m = membershipInTenant(u, selectedTenantId);
             const inviteKey = `${u.id}:${selectedTenantId}`;
             const justSent = !!inviteSent[inviteKey];
 
@@ -713,18 +790,23 @@ export default function UsersPanel() {
               <div key={u.id} className="grid grid-cols-12 gap-2 px-3 py-2 text-sm items-center">
                 <div className="col-span-4 text-white/80">
                   {isEditing ? (
-                    <input
-                      className="w-full rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm outline-none"
-                      value={editName}
-                      onChange={(e) => setEditName(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") saveEdit(u.id);
-                        if (e.key === "Escape") cancelEdit();
-                      }}
-                      placeholder="Full name"
-                      disabled={busy}
-                      autoFocus
-                    />
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        className="w-full rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm outline-none"
+                        value={editFirstName}
+                        onChange={(e) => setEditFirstName(e.target.value)}
+                        disabled={busy}
+                        autoFocus
+                        placeholder="First Name"
+                      />
+                      <input
+                        className="w-full rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm outline-none"
+                        value={editLastName}
+                        onChange={(e) => setEditLastName(e.target.value)}
+                        disabled={busy}
+                        placeholder="Second Name"
+                      />
+                    </div>
                   ) : (
                     <div className="flex items-center gap-2">
                       <span className="truncate">{u.name ?? "-"}</span>
@@ -741,12 +823,8 @@ export default function UsersPanel() {
                       className="w-full rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm outline-none"
                       value={editEmail}
                       onChange={(e) => setEditEmail(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") saveEdit(u.id);
-                        if (e.key === "Escape") cancelEdit();
-                      }}
-                      placeholder="email@company.com"
                       disabled={busy}
+                      placeholder="email@company.com"
                     />
                   ) : (
                     <div className="truncate">{u.email}</div>
@@ -765,7 +843,7 @@ export default function UsersPanel() {
                       <option value="CORE_ADMIN">CORE</option>
                     </select>
                   ) : (
-                    <div className="truncate">{shownType === "CORE_ADMIN" ? "CORE" : "TENANT"}</div>
+                    <div className="truncate">{m?.role ?? "-"}</div>
                   )}
                 </div>
 
@@ -776,7 +854,6 @@ export default function UsersPanel() {
                         onClick={() => saveEdit(u.id)}
                         disabled={busy || (editType === "TENANT_ADMIN" && !selectedTenantId)}
                         className="h-9 rounded-md bg-blue-600 px-4 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-                        title={editType === "TENANT_ADMIN" && !selectedTenantId ? "Select tenant first" : "Save"}
                       >
                         Save
                       </button>
@@ -807,15 +884,9 @@ export default function UsersPanel() {
                       ) : (
                         <button
                           onClick={() => sendInvite(u)}
-                          disabled={busy || !selectedTenantId || deriveType(u) === "CORE_ADMIN"}
+                          disabled={busy || !selectedTenantId}
                           className="h-9 rounded-md bg-purple-600 px-4 text-sm font-medium text-white hover:bg-purple-700 disabled:opacity-50"
-                          title={
-                            !selectedTenantId
-                              ? "Select tenant first"
-                              : deriveType(u) === "CORE_ADMIN"
-                                ? "Core admin invite not supported"
-                                : `Send invite to ${selectedTenantLabel()}`
-                          }
+                          title={!selectedTenantId ? "Select tenant first" : `Send invite to ${selectedTenantLabel()}`}
                         >
                           Invite
                         </button>
@@ -851,11 +922,15 @@ export default function UsersPanel() {
           })}
 
           {selectedTenantId && tenantAdmins.length === 0 && !err && (
-            <div className="px-3 py-3 text-sm text-white/50">No users for selected tenant.</div>
+            <div className="px-3 py-3 text-sm text-white/50">
+              No tenant admins found for selected tenant.
+            </div>
           )}
 
           {!selectedTenantId && (
-            <div className="px-3 py-3 text-sm text-white/50">Select a tenant to view users.</div>
+            <div className="px-3 py-3 text-sm text-white/50">
+              Select a tenant to view tenant users.
+            </div>
           )}
         </div>
       </div>

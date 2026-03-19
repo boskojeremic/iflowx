@@ -15,36 +15,46 @@ model Tenant {
   updatedAt DateTime @updatedAt
   isActive  Boolean  @default(true)
 
-  apiKeys             ApiKey[]
-  assets              Asset[]
-  assetTypes          AssetType[]
-  CalculatedResult    CalculatedResult[]
-  results             EmissionResult[]
-  emitters            Emitter[]
-  Site                Site[]
-  Facility            Facility[]
-  inputs              GHGInput[]
-  invites             Invite[]
-  observations        Observation[]
-  points              MeasurementPoint[]
-  readings            MeasurementReading[]
-  members             Membership[]
-  ReportDayStatus     ReportDayStatus[]
-  ReportAssignment    ReportAssignment[]
-  ReportRun           ReportRun[]
-  periods             ReportingPeriod[]
-  tenantIndustries    TenantIndustry[]
-  tenantModules       TenantModule[]
-  TenantReportDefault TenantReportDefault[]
+  apiKeys                   ApiKey[]
+  assets                    Asset[]
+  assetTypes                AssetType[]
+  CalculatedResult          CalculatedResult[]
+  results                   EmissionResult[]
+  emitters                  Emitter[]
+  Site                      Site[]
+  Facility                  Facility[]
+  inputs                    GHGInput[]
+  invites                   Invite[]
+  observations              Observation[]
+  points                    MeasurementPoint[]
+  readings                  MeasurementReading[]
+  members                   Membership[]
+  ReportDayStatus           ReportDayStatus[]
+  ReportAssignment          ReportAssignment[]
+  ReportRun                 ReportRun[]
+  periods                   ReportingPeriod[]
+  tenantIndustries          TenantIndustry[]
+  tenantModules             TenantModule[]
+  TenantReportDefault       TenantReportDefault[]
+  operationalFunctions      OperationalFunction[]
+  reportFunctionAssignments TenantReportFunctionAssignment[]
 }
 
 model User {
-  id                 String             @id @default(cuid())
-  email              String             @unique
-  name               String?
-  createdAt          DateTime           @default(now())
-  passwordHash       String?
-  isSuperAdmin       Boolean            @default(false)
+  id            String  @id @default(cuid())
+  email         String  @unique
+  name          String?
+  firstName     String?
+  lastName      String?
+  userLogin     String?
+  legacySqlId   Int?    @unique
+  legacyRoleId  Int?
+  isTenantAdmin Boolean @default(false)
+
+  createdAt    DateTime @default(now())
+  passwordHash String?
+  isSuperAdmin Boolean  @default(false)
+
   accounts           Account[]
   membershipsCreated Membership[]       @relation("MembershipCreatedBy")
   memberships        Membership[]       @relation("MembershipUser")
@@ -53,24 +63,59 @@ model User {
 }
 
 model Membership {
-  id              String           @id @default(cuid())
-  tenantId        String
-  userId          String
-  role            MemberRole       @default(VIEWER)
-  createdAt       DateTime         @default(now())
-  status          MembershipStatus @default(ACTIVE)
-  accessStartsAt  DateTime?        @db.Timestamp(6)
-  accessEndsAt    DateTime?        @db.Timestamp(6)
-  createdByUserId String?
-  createdByUser   User?            @relation("MembershipCreatedBy", fields: [createdByUserId], references: [id])
-  tenant          Tenant           @relation(fields: [tenantId], references: [id])
-  user            User             @relation("MembershipUser", fields: [userId], references: [id])
+  id                    String               @id @default(cuid())
+  tenantId              String
+  userId                String
+  role                  MemberRole           @default(VIEWER)
+  operationalFunctionId String?
+  createdAt             DateTime             @default(now())
+  status                MembershipStatus     @default(ACTIVE)
+  accessStartsAt        DateTime?            @db.Timestamp(6)
+  accessEndsAt          DateTime?            @db.Timestamp(6)
+  createdByUserId       String?
+  createdByUser         User?                @relation("MembershipCreatedBy", fields: [createdByUserId], references: [id])
+  tenant                Tenant               @relation(fields: [tenantId], references: [id])
+  user                  User                 @relation("MembershipUser", fields: [userId], references: [id])
+  operationalFunction   OperationalFunction? @relation(fields: [operationalFunctionId], references: [id])
 
   @@unique([tenantId, userId], name: "tenantId_userId")
   @@index([createdByUserId])
   @@index([tenantId])
   @@index([userId])
+  @@index([operationalFunctionId])
   @@index([accessEndsAt], map: "idx_membership_access_end")
+}
+
+model OperationalFunction {
+  id       String  @id @default(cuid())
+  tenantId String?
+
+  // editable columns
+  abbreviation String
+  name         String
+
+  // optional normalized code
+  code String?
+
+  // legacy snapshot from SQL Server
+  legacySqlId            Int?                             @unique
+  legacyInsertDt         DateTime?
+  legacyCreatedBy        String?
+  legacyUpdateDt         DateTime?
+  legacyUpdEndDt         DateTime?
+  legacyUpdatedBy        String?
+  responsibleAssignments TenantReportFunctionAssignment[] @relation("ResponsibleFunctionAssignments")
+  approverAssignments    TenantReportFunctionAssignment[] @relation("ApproverFunctionAssignments")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant      Tenant?      @relation(fields: [tenantId], references: [id])
+  memberships Membership[]
+
+  @@unique([tenantId, abbreviation])
+  @@index([tenantId])
+  @@map("operational_functions")
 }
 
 model Invite {
@@ -626,20 +671,21 @@ model ReportDayStatus {
 }
 
 model ReportDefinition {
-  id                  String                @id
-  reportGroupId       String
-  code                String
-  name                String
-  description         String?
-  sortOrder           Int                   @default(100)
-  isActive            Boolean               @default(true)
-  Formula             Formula[]
-  ReportDayStatus     ReportDayStatus[]
-  ReportGroup         ReportGroup           @relation(fields: [reportGroupId], references: [id], onDelete: Cascade)
-  ReportMethodology   ReportMethodology[]
-  ReportRun           ReportRun[]
-  TenantReportDefault TenantReportDefault[]
-  ReportAssignment    ReportAssignment[]
+  id                        String                           @id
+  reportGroupId             String
+  code                      String
+  name                      String
+  description               String?
+  sortOrder                 Int                              @default(100)
+  isActive                  Boolean                          @default(true)
+  Formula                   Formula[]
+  ReportDayStatus           ReportDayStatus[]
+  ReportGroup               ReportGroup                      @relation(fields: [reportGroupId], references: [id], onDelete: Cascade)
+  ReportMethodology         ReportMethodology[]
+  ReportRun                 ReportRun[]
+  TenantReportDefault       TenantReportDefault[]
+  ReportAssignment          ReportAssignment[]
+  reportFunctionAssignments TenantReportFunctionAssignment[]
 
   @@unique([reportGroupId, code])
   @@index([reportGroupId])
@@ -724,6 +770,28 @@ model ReportAssignment {
   @@index([tenantId])
   @@index([userId])
   @@index([reportId])
+}
+
+model TenantReportFunctionAssignment {
+  id                    String   @id @default(cuid())
+  tenantId              String
+  reportId              String
+  responsibleFunctionId String?
+  approverFunctionId    String?
+  isActive              Boolean  @default(true)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  tenant              Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  report              ReportDefinition     @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  responsibleFunction OperationalFunction? @relation("ResponsibleFunctionAssignments", fields: [responsibleFunctionId], references: [id])
+  approverFunction    OperationalFunction? @relation("ApproverFunctionAssignments", fields: [approverFunctionId], references: [id])
+
+  @@unique([tenantId, reportId])
+  @@index([tenantId])
+  @@index([reportId])
+  @@index([responsibleFunctionId])
+  @@index([approverFunctionId])
 }
 
 enum ReportUserRole {

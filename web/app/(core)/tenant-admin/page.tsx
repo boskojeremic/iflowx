@@ -1,24 +1,77 @@
-"use client";
-
-import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { getServerSession } from "next-auth/next";
+
+import { authOptions } from "@/lib/auth";
+import { db } from "@/lib/db";
 
 import TenantUsersPanel from "@/components/tenant-admin/TenantUsersPanel";
-import TenantRolesPanel from "@/components/tenant-admin/TenantRolesPanel";
 import ReportAssignmentsPanel from "@/components/tenant-admin/ReportAssignmentsPanel";
-import TechnicalSetupPanel from "@/components/tenant-admin/TechnicalSetupPanel";
+import OperationalFunctionPanel from "@/components/tenant-admin/OperationalFunctionPanel";
 
 const tabs = [
   { key: "users", label: "Users" },
-  { key: "roles", label: "Roles" },
+  { key: "roles", label: "Operational Functions" },
   { key: "report-assignments", label: "Report Assignments" },
-  ] as const;
+] as const;
 
-type TabKey = (typeof tabs)[number]["key"];
+type SearchParams = Promise<{
+  tab?: string;
+}>;
 
-export default function TenantAdminPage() {
-  const sp = useSearchParams();
-  const tab = ((sp?.get("tab") as TabKey | null) ?? "users");
+export const dynamic = "force-dynamic";
+
+export default async function TenantAdminPage({
+  searchParams,
+}: {
+  searchParams: SearchParams;
+}) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.email) redirect("/login");
+
+  const sp = await searchParams;
+  const tab = sp?.tab ?? "users";
+
+  const membership = await db.membership.findFirst({
+    where: {
+      user: {
+        email: session.user.email,
+      },
+      status: "ACTIVE",
+    },
+    select: {
+      tenantId: true,
+      tenant: {
+        select: {
+          id: true,
+          name: true,
+          code: true,
+        },
+      },
+    },
+  });
+
+  if (!membership) {
+    return <div className="p-6 text-red-400">No active tenant found.</div>;
+  }
+
+  const tenantId = membership.tenantId;
+
+  const functions = await db.operationalFunction.findMany({
+    where: {
+      tenantId,
+    },
+    include: {
+      _count: {
+        select: {
+          memberships: true,
+        },
+      },
+    },
+    orderBy: {
+      name: "asc",
+    },
+  });
 
   return (
     <div className="space-y-6 p-6">
@@ -51,9 +104,9 @@ export default function TenantAdminPage() {
 
       <div className="rounded-xl border border-white/10 bg-white/5 p-4">
         {tab === "users" && <TenantUsersPanel />}
-        {tab === "roles" && <TenantRolesPanel />}
+        {tab === "roles" && <OperationalFunctionPanel functions={functions} />}
         {tab === "report-assignments" && <ReportAssignmentsPanel />}
-</div>
+      </div>
     </div>
   );
 }

@@ -10,6 +10,7 @@ import { getBaseUrl } from "@/lib/url";
 export const runtime = "nodejs";
 
 type ValidityUnit = "DAYS" | "MONTHS" | "YEARS";
+type InviteRole = "OWNER" | "ADMIN" | "EDITOR" | "VIEWER";
 
 function clampInt(v: unknown, min: number, max: number) {
   const n = Number(v);
@@ -50,6 +51,14 @@ function maxDate(dates: Date[]) {
   return new Date(Math.max(...dates.map((d) => d.getTime())));
 }
 
+function normalizeRole(v: unknown): InviteRole {
+  const role = String(v ?? "").trim().toUpperCase();
+  if (role === "OWNER" || role === "ADMIN" || role === "EDITOR" || role === "VIEWER") {
+    return role;
+  }
+  return "VIEWER";
+}
+
 export async function POST(req: Request) {
   console.log("[INVITES] ROUTE_HIT");
 
@@ -63,7 +72,7 @@ export async function POST(req: Request) {
 
     const me = await db.user.findUnique({
       where: { email: session.user.email },
-      select: { id: true, email: true, isSuperAdmin: true },
+      select: { id: true, email: true, name: true, isSuperAdmin: true },
     });
 
     console.log("[INVITES] me:", me);
@@ -74,12 +83,10 @@ export async function POST(req: Request) {
 
     const body = await req.json().catch(() => ({}));
 
-    const tenantId = String(body.tenantId || "").trim();
-    const email = String(body.email || "").trim().toLowerCase();
-    const name = body.name === null ? null : String(body.name || "").trim() || null;
-
-    // Core Admin flow: always ADMIN
-    const role = "ADMIN";
+    const tenantId = String(body?.tenantId || "").trim();
+    const email = String(body?.email || "").trim().toLowerCase();
+    const name = body?.name === null ? null : String(body?.name || "").trim() || null;
+    const role = normalizeRole(body?.role);
 
     console.log("[INVITES] payload:", { tenantId, email, name, role });
 
@@ -111,6 +118,7 @@ export async function POST(req: Request) {
       const activeTmCount = await db.tenantModule.count({
         where: { tenantId, status: "ACTIVE" },
       });
+
       if (activeTmCount === 0) {
         return NextResponse.json(
           { ok: false, error: "TENANT_HAS_NO_LICENSED_MODULES" },
@@ -160,7 +168,6 @@ export async function POST(req: Request) {
       expiresAt: expiresAt.toISOString(),
     });
 
-    // ensure user exists and preserve existing name if no new name provided
     const invitedUser = await db.user.upsert({
       where: { email },
       create: {
@@ -176,14 +183,14 @@ export async function POST(req: Request) {
     await db.membership.upsert({
       where: { tenantId_userId: { tenantId, userId: invitedUser.id } },
       update: {
-        role: "ADMIN",
+        role: role as any,
         status: "INVITED",
         createdByUserId: me.id,
       },
       create: {
         tenantId,
         userId: invitedUser.id,
-        role: "ADMIN",
+        role: role as any,
         status: "INVITED",
         createdByUserId: me.id,
       },
@@ -221,12 +228,19 @@ export async function POST(req: Request) {
     let emailed = false;
     let emailError: string | null = null;
 
+    const issuedBy = me.isSuperAdmin
+      ? "IFlowX Super Admin"
+      : me.name?.trim()
+        ? `${me.name.trim()} (Tenant Admin)`
+        : "IFlowX Tenant Admin";
+
     try {
       console.log("[INVITES] SENDING_EMAIL", {
         to: email,
         tenantId,
         tenantName: tenant?.name ?? null,
         role,
+        issuedBy,
         hasResendKey: !!process.env.RESEND_API_KEY,
       });
 
@@ -240,7 +254,7 @@ export async function POST(req: Request) {
         licenseStart: accessStartsAt,
         licenseEnd: accessEndsAt,
         issuedTo: email,
-        issuedBy: "IFlowX Super Admin",
+        issuedBy,
       });
 
       emailed = true;
@@ -260,6 +274,8 @@ export async function POST(req: Request) {
       ensuredMembership: true,
       accessStartsAt,
       accessEndsAt,
+      role,
+      issuedBy,
     });
   } catch (e: any) {
     console.error("[INVITES] FATAL:", e);

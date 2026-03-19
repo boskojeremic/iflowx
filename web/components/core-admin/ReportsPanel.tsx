@@ -178,7 +178,6 @@ export default function ReportsPanel() {
 
   useEffect(() => {
     loadIndustries();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -191,7 +190,6 @@ export default function ReportsPanel() {
     setSortOrder("100");
 
     loadModules(industryId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [industryId]);
 
   useEffect(() => {
@@ -209,7 +207,6 @@ export default function ReportsPanel() {
     setSortOrder("100");
 
     loadReportGroups(moduleId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [moduleId]);
 
   useEffect(() => {
@@ -225,7 +222,6 @@ export default function ReportsPanel() {
     setSortOrder("100");
 
     loadReports(groupId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groupId]);
 
   function startEdit(r: ReportRow) {
@@ -333,7 +329,6 @@ export default function ReportsPanel() {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-12 gap-2 items-center">
-        {/* Industry */}
         <select
           className="col-span-12 md:col-span-4 min-w-0 px-3 py-2 bg-black/40 border border-white/20 rounded-md"
           value={industryId}
@@ -347,7 +342,6 @@ export default function ReportsPanel() {
           ))}
         </select>
 
-        {/* Module */}
         <select
           className="col-span-12 md:col-span-4 min-w-0 px-3 py-2 bg-black/40 border border-white/20 rounded-md"
           value={moduleId}
@@ -361,7 +355,6 @@ export default function ReportsPanel() {
           ))}
         </select>
 
-        {/* Report Group */}
         <select
           className="col-span-12 md:col-span-4 min-w-0 px-3 py-2 bg-black/40 border border-white/20 rounded-md"
           value={groupId}
@@ -375,16 +368,14 @@ export default function ReportsPanel() {
           ))}
         </select>
 
-        {/* Code */}
         <input
           className="col-span-6 md:col-span-2 min-w-0 px-3 py-2 bg-black/40 border border-white/20 rounded-md"
           placeholder="CODE"
           value={code}
-          onChange={(e) => setCode(upper(e.target.value))}
+          onChange={(e) => setCode(e.target.value)}
           disabled={busy}
         />
 
-        {/* Sort */}
         <input
           className="col-span-6 md:col-span-1 min-w-0 px-3 py-2 bg-black/40 border border-white/20 rounded-md"
           placeholder="SORT"
@@ -393,12 +384,11 @@ export default function ReportsPanel() {
           disabled={busy}
         />
 
-        {/* Name */}
         <input
           className="col-span-12 md:col-span-6 min-w-0 px-3 py-2 bg-black/40 border border-white/20 rounded-md"
           placeholder="NAME"
           value={name}
-          onChange={(e) => setName(upper(e.target.value))}
+          onChange={(e) => setName(e.target.value)}
           disabled={busy}
         />
 
@@ -418,17 +408,16 @@ export default function ReportsPanel() {
           )}
         </div>
 
-        {/* Description */}
         <input
           className="col-span-12 min-w-0 px-3 py-2 bg-black/40 border border-white/20 rounded-md"
           placeholder="DESCRIPTION"
           value={description}
-          onChange={(e) => setDescription(upper(e.target.value))}
+          onChange={(e) => setDescription(e.target.value)}
           disabled={busy}
         />
       </div>
 
-      <div className="space-y-2">
+      <div className="space-y-2 max-h-[520px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-emerald-800 scrollbar-track-transparent">
         {rows.length === 0 && (
           <div className="p-3 rounded border border-white/10 bg-white/5 text-sm opacity-70">
             No Reports for selected Report Group.

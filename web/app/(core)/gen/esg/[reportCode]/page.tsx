@@ -3,6 +3,8 @@ import { notFound, redirect } from "next/navigation";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { powerBIReports } from "@/lib/powerbi-reports";
+import PowerBIEmbed from "@/components/PowerBIEmbed";
 
 export const dynamic = "force-dynamic";
 
@@ -82,6 +84,8 @@ export default async function ESGReportPage({
   const tabs = [
     { key: "data-entry", label: "Data Entry" },
     { key: "calculations", label: "Calculations" },
+    { key: "review-package", label: "Review Package" },
+    { key: "dashboards", label: "Dashboards" },
     { key: "report-view", label: "Report View" },
   ];
 
@@ -90,7 +94,6 @@ export default async function ESGReportPage({
 
   return (
     <div className="p-6 space-y-6 min-h-full overflow-y-auto">
-      {/* Breadcrumb */}
       <div className="text-sm text-white/50">
         <Link href="/gen/esg" className="hover:text-white/80 transition">
           ESG Reports
@@ -99,7 +102,6 @@ export default async function ESGReportPage({
         <span className="text-white/80">{report.name}</span>
       </div>
 
-      {/* Header */}
       <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
@@ -132,7 +134,6 @@ export default async function ESGReportPage({
         </div>
       </div>
 
-      {/* Tabs */}
       <div className="flex flex-wrap gap-2">
         {tabs.map((t) => {
           const active = tab === t.key;
@@ -153,19 +154,16 @@ export default async function ESGReportPage({
         })}
       </div>
 
-      {/* Workspace */}
       <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 min-h-[520px]">
         {tab === "data-entry" && (
           <div className="space-y-5">
-            {/* Section header */}
             <div>
               <div className="text-xl font-semibold">Data Entry</div>
               <div className="mt-1 text-sm text-white/60">
-                Enter, Review, And Validate Input Data For This Report
+                Enter, review, and validate input data for this report.
               </div>
             </div>
 
-            {/* Top control bar */}
             <div className="grid gap-3 xl:grid-cols-4">
               <div className="rounded-xl border border-white/10 bg-black/20 p-4">
                 <div className="text-xs uppercase tracking-wide text-white/45">
@@ -203,11 +201,8 @@ export default async function ESGReportPage({
               </div>
             </div>
 
-            {/* Main split layout */}
             <div className="grid gap-5 xl:grid-cols-12">
-              {/* LEFT */}
               <div className="xl:col-span-7 space-y-5">
-                {/* Report info */}
                 <div className="rounded-xl border border-white/10 bg-black/20 p-4">
                   <div className="text-sm font-semibold">Report Context</div>
                   <div className="mt-3 grid gap-3 md:grid-cols-2">
@@ -241,13 +236,12 @@ export default async function ESGReportPage({
                   </div>
                 </div>
 
-                {/* Inputs */}
                 <div className="rounded-xl border border-white/10 bg-black/20 p-4">
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <div className="text-sm font-semibold">Input Fields</div>
                       <div className="mt-1 text-xs text-white/50">
-                        Primary Inputs, Manual Overrides, And Supporting Values
+                        Primary inputs, manual overrides, and supporting values.
                       </div>
                     </div>
 
@@ -322,37 +316,41 @@ export default async function ESGReportPage({
                 </div>
               </div>
 
-              {/* RIGHT */}
               <div className="xl:col-span-5 space-y-5">
-                {/* Saved values */}
                 <div className="rounded-xl border border-white/10 bg-black/20 p-4">
-                  <div className="text-sm font-semibold">Saved Values</div>
+                  <div className="text-sm font-semibold">Draft Status</div>
                   <div className="mt-1 text-xs text-white/50">
-                    Existing Records For The Selected Day / Period
+                    Current preparation state for this reporting package.
                   </div>
 
                   <div className="mt-4 space-y-3">
-                    <div className="rounded-lg border border-white/10 bg-black/20 p-3">
+                    <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-3">
                       <div className="text-xs uppercase tracking-wide text-white/45">
-                        Status
+                        Current Status
                       </div>
-                      <div className="mt-1 text-sm text-white/70">
-                        No Values Loaded Yet
-                      </div>
+                      <div className="mt-1 text-sm text-emerald-300">Draft</div>
                     </div>
 
                     <div className="rounded-lg border border-white/10 bg-black/20 p-3">
                       <div className="text-xs uppercase tracking-wide text-white/45">
-                        Last Update
+                        Last Saved
                       </div>
                       <div className="mt-1 text-sm text-white/70">—</div>
+                    </div>
+
+                    <div className="rounded-lg border border-white/10 bg-black/20 p-3">
+                      <div className="text-xs uppercase tracking-wide text-white/45">
+                        Reporting Scope
+                      </div>
+                      <div className="mt-1 text-sm text-white/70">
+                        Direct and indirect emissions input package
+                      </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Validation */}
                 <div className="rounded-xl border border-white/10 bg-black/20 p-4">
-                  <div className="text-sm font-semibold">Validation</div>
+                  <div className="text-sm font-semibold">Input Validation</div>
                   <div className="mt-3 space-y-2 text-sm text-white/65">
                     <div className="rounded-lg border border-white/10 bg-black/20 px-3 py-2">
                       Required Fields Must Be Completed
@@ -363,20 +361,22 @@ export default async function ESGReportPage({
                     <div className="rounded-lg border border-white/10 bg-black/20 px-3 py-2">
                       Duplicate Entries Should Be Avoided
                     </div>
+                    <div className="rounded-lg border border-white/10 bg-black/20 px-3 py-2">
+                      Calculation Package Must Be Generated Before Submission
+                    </div>
                   </div>
                 </div>
 
-                {/* Workflow */}
                 <div className="rounded-xl border border-white/10 bg-black/20 p-4">
-                  <div className="text-sm font-semibold">Workflow</div>
+                  <div className="text-sm font-semibold">Entry Actions</div>
                   <div className="mt-3 flex flex-wrap gap-2">
                     <button className="rounded-md border border-white/10 bg-white/[0.04] px-3 py-2 text-sm hover:bg-white/10 transition">
                       Save Draft
                     </button>
-                    <button className="rounded-md border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-sm text-amber-300 hover:bg-amber-500/15 transition">
-                      Submit
-                    </button>
                     <button className="rounded-md border border-blue-500/20 bg-blue-500/10 px-3 py-2 text-sm text-blue-300 hover:bg-blue-500/15 transition">
+                      Run Calculations
+                    </button>
+                    <button className="rounded-md border border-white/10 bg-white/[0.04] px-3 py-2 text-sm hover:bg-white/10 transition">
                       Refresh
                     </button>
                   </div>
@@ -391,46 +391,264 @@ export default async function ESGReportPage({
             <div>
               <div className="text-xl font-semibold">Calculations</div>
               <div className="mt-1 text-sm text-white/60">
-                Review Derived Values, Formula Outputs, And Calculation Logic
+                Review derived values, formula outputs, and calculation logic.
               </div>
             </div>
 
             <div className="rounded-xl border border-white/10 bg-black/20 p-4">
               <div className="font-medium">Calculation Engine</div>
               <div className="mt-3 text-sm text-white/60">
-                This Area Will Show Formula Results, Intermediate Values, And
-                Traceability For The Selected Report.
+                This area should show formula results, intermediate values,
+                traceability, emission factors, and aggregation logic for the
+                selected report.
+              </div>
+            </div>
+          </div>
+        )}
+
+        {tab === "review-package" && (
+          <div className="space-y-5">
+            <div>
+              <div className="text-xl font-semibold">Review Package</div>
+              <div className="mt-1 text-sm text-white/60">
+                Consolidated review package with calculated results, KPI summary,
+                validation outcome, and approval-ready presentation.
+              </div>
+            </div>
+
+            <div className="grid gap-5 xl:grid-cols-12">
+              <div className="xl:col-span-8 space-y-5">
+                <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+                  <div className="text-sm font-semibold">Submission Summary</div>
+                  <div className="mt-3 grid gap-3 md:grid-cols-2">
+                    <div className="rounded-lg border border-white/10 bg-black/20 p-3">
+                      <div className="text-xs uppercase tracking-wide text-white/45">
+                        Report
+                      </div>
+                      <div className="mt-1 text-sm">{report.name}</div>
+                    </div>
+
+                    <div className="rounded-lg border border-white/10 bg-black/20 p-3">
+                      <div className="text-xs uppercase tracking-wide text-white/45">
+                        Report Code
+                      </div>
+                      <div className="mt-1 text-sm">{report.code}</div>
+                    </div>
+
+                    <div className="rounded-lg border border-white/10 bg-black/20 p-3">
+                      <div className="text-xs uppercase tracking-wide text-white/45">
+                        Review Package Status
+                      </div>
+                      <div className="mt-1 text-sm text-amber-300">
+                        Pending Calculation Results
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg border border-white/10 bg-black/20 p-3">
+                      <div className="text-xs uppercase tracking-wide text-white/45">
+                        Submission Type
+                      </div>
+                      <div className="mt-1 text-sm">Approval Package</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+                  <div className="text-sm font-semibold">KPI Summary</div>
+                  <div className="mt-3 grid gap-3 md:grid-cols-3">
+                    <div className="rounded-lg border border-white/10 bg-black/20 p-3">
+                      <div className="text-xs uppercase tracking-wide text-white/45">
+                        Total Scope 1
+                      </div>
+                      <div className="mt-2 text-lg font-semibold">—</div>
+                    </div>
+
+                    <div className="rounded-lg border border-white/10 bg-black/20 p-3">
+                      <div className="text-xs uppercase tracking-wide text-white/45">
+                        Total Scope 2
+                      </div>
+                      <div className="mt-2 text-lg font-semibold">—</div>
+                    </div>
+
+                    <div className="rounded-lg border border-white/10 bg-black/20 p-3">
+                      <div className="text-xs uppercase tracking-wide text-white/45">
+                        Combined Emissions
+                      </div>
+                      <div className="mt-2 text-lg font-semibold">—</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+                  <div className="text-sm font-semibold">
+                    Validation And Reviewer Notes
+                  </div>
+                  <div className="mt-3 space-y-3">
+                    <div className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-sm text-white/70">
+                      Calculation package has not yet been generated.
+                    </div>
+
+                    <textarea
+                      rows={5}
+                      placeholder="Reviewer / preparer notes for approval package..."
+                      className="w-full rounded-md border border-white/15 bg-black/30 px-3 py-2 text-sm"
+                    />
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+                  <div className="text-sm font-semibold">Charts And Attachments</div>
+                  <div className="mt-3 rounded-lg border border-dashed border-white/10 bg-black/20 p-6 text-sm text-white/50">
+                    This area should present selected charts, trend visuals, and
+                    export-ready summary content that will be included in the
+                    approval package.
+                  </div>
+                </div>
+              </div>
+
+              <div className="xl:col-span-4 space-y-5">
+                <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+                  <div className="text-sm font-semibold">Submission Readiness</div>
+                  <div className="mt-3 space-y-2 text-sm text-white/65">
+                    <div className="rounded-lg border border-white/10 bg-black/20 px-3 py-2">
+                      Input Data Saved
+                    </div>
+                    <div className="rounded-lg border border-white/10 bg-black/20 px-3 py-2">
+                      Calculations Generated
+                    </div>
+                    <div className="rounded-lg border border-white/10 bg-black/20 px-3 py-2">
+                      KPI Summary Reviewed
+                    </div>
+                    <div className="rounded-lg border border-white/10 bg-black/20 px-3 py-2">
+                      Approval Notes Completed
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+                  <div className="text-sm font-semibold">Approval Actions</div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button className="rounded-md border border-blue-500/20 bg-blue-500/10 px-3 py-2 text-sm text-blue-300 hover:bg-blue-500/15 transition">
+                      Generate Review Package
+                    </button>
+                    <button className="rounded-md border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-sm text-amber-300 hover:bg-amber-500/15 transition">
+                      Submit For Approval
+                    </button>
+                    <button className="rounded-md border border-white/10 bg-white/[0.04] px-3 py-2 text-sm hover:bg-white/10 transition">
+                      Export Summary
+                    </button>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+                  <div className="text-sm font-semibold">Approval Logic</div>
+                  <div className="mt-3 text-sm text-white/60">
+                    Approval must be performed on the consolidated review package,
+                    including inputs, calculated results, validation summary,
+                    and selected visual outputs — not on raw input data alone.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {tab === "dashboards" && (
+          <div className="space-y-4">
+            <div>
+              <div className="text-xl font-semibold">Dashboards</div>
+              <div className="mt-1 text-sm text-white/60">
+                Interactive analytical dashboards for review, monitoring, and
+                visual analysis.
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+              <div className="font-medium">Power BI Dashboard</div>
+              <div className="mt-3 text-sm text-white/60">
+                This section provides interactive dashboard views and analytical
+                visuals.
+              </div>
+
+              <div className="mt-4">
+                <PowerBIEmbed
+                  title={powerBIReports.esg.title}
+                  reportUrl={powerBIReports.esg.url}
+                />
               </div>
             </div>
           </div>
         )}
 
         {tab === "report-view" && (
-  <div className="space-y-4">
-    <div>
-      <div className="text-xl font-semibold">Report View</div>
-      <div className="mt-1 text-sm text-white/60">
-        Final Presentation Layer For Review, Export, And Client Output
-      </div>
-    </div>
+          <div className="space-y-5">
+            <div>
+              <div className="text-xl font-semibold">Report View</div>
+              <div className="mt-1 text-sm text-white/60">
+                Final report layout prepared for PDF generation, approval, and
+                formal issue.
+              </div>
+            </div>
 
-    <div className="rounded-xl border border-white/10 bg-black/20 p-4">
-      <div className="font-medium">Final Report Output</div>
-      <div className="mt-3 text-sm text-white/60">
-        Embedded GHG Emissions Inventory dashboard.
-      </div>
+            <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+              <div className="text-sm font-semibold">Final Report Summary</div>
+              <div className="mt-3 grid gap-3 md:grid-cols-3">
+                <div className="rounded-lg border border-white/10 bg-black/20 p-3">
+                  <div className="text-xs uppercase tracking-wide text-white/45">
+                    Total Scope 1
+                  </div>
+                  <div className="mt-2 text-lg font-semibold">—</div>
+                </div>
 
-      <div className="mt-4 h-[900px] overflow-auto rounded-xl border border-white/10 bg-[#06110d]">
-  <iframe
-    title="GHG Emissions Inventory ESG Report"
-    src="https://app.powerbi.com/reportEmbed?reportId=57dfe52d-a566-41dc-875d-167be01ee9c7&autoAuth=true&ctid=a69bf50c-65ed-4660-985b-04e1ffe59fdc&navContentPaneEnabled=false&pageNavigationPosition=none&filterPaneEnabled=false"
-    className="h-full w-full border-0"
-    allowFullScreen
-  />
-</div>
-    </div>
-  </div>
-)}
+                <div className="rounded-lg border border-white/10 bg-black/20 p-3">
+                  <div className="text-xs uppercase tracking-wide text-white/45">
+                    Total Scope 2
+                  </div>
+                  <div className="mt-2 text-lg font-semibold">—</div>
+                </div>
+
+                <div className="rounded-lg border border-white/10 bg-black/20 p-3">
+                  <div className="text-xs uppercase tracking-wide text-white/45">
+                    Total Emissions
+                  </div>
+                  <div className="mt-2 text-lg font-semibold">—</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+              <div className="text-sm font-semibold">Report Narrative</div>
+              <div className="mt-3 rounded-lg border border-white/10 bg-black/20 p-4 text-sm text-white/60">
+                This area should contain the final structured report text,
+                interpretation, methodology notes, explanatory commentary, and
+                approval-ready content that will be exported to PDF.
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+              <div className="text-sm font-semibold">Tables And Attachments</div>
+              <div className="mt-3 rounded-lg border border-dashed border-white/10 bg-black/20 p-6 text-sm text-white/50">
+                Final report tables, annexes, supporting notes, and PDF-ready
+                sections should be shown here.
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+              <div className="text-sm font-semibold">Report Actions</div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button className="rounded-md border border-white/10 bg-white/[0.04] px-3 py-2 text-sm hover:bg-white/10 transition">
+                  Generate PDF
+                </button>
+                <button className="rounded-md border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-300 hover:bg-emerald-500/15 transition">
+                  Finalize Report
+                </button>
+                <button className="rounded-md border border-blue-500/20 bg-blue-500/10 px-3 py-2 text-sm text-blue-300 hover:bg-blue-500/15 transition">
+                  Export Package
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

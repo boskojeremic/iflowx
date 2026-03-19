@@ -100,9 +100,10 @@ export default function ReportGroupsPanel() {
 
     setModules(list);
 
-    if (!moduleId && list.length > 0) {
-      setModuleId(list[0].id);
-    }
+setModuleId((prev) => {
+  if (prev && list.some((m) => m.id === prev)) return prev;
+  return list[0]?.id || "";
+});
   }
 
   async function loadReportGroups(selectedModuleId?: string) {

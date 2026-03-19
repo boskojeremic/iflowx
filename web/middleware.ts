@@ -4,10 +4,13 @@ import { getToken } from "next-auth/jwt";
 export async function middleware(req: any) {
   const { pathname } = req.nextUrl;
 
-  // ✅ uvek pusti login i nextauth rute (sprečava loop)
+  // javne / tehničke rute koje ne smeju da idu na login
   if (
     pathname.startsWith("/login") ||
     pathname.startsWith("/api/auth") ||
+    pathname.startsWith("/api/fop") ||
+    pathname.startsWith("/fop-preview") ||
+    pathname.startsWith("/test-pdf") ||
     pathname.startsWith("/_next") ||
     pathname === "/favicon.ico" ||
     pathname.startsWith("/public")

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { AdminRowButton } from "@/components/core-admin/AdminButtons";
+import { useSelectedTenant } from "@/hooks/useSelectedTenant";
 
 import {
   AlertDialog,
@@ -76,13 +77,18 @@ export default function LicensingPanel() {
   const [tenantModules, setTenantModules] = useState<TenantModuleRow[]>([]);
 
   const [industryId, setIndustryId] = useState<string>("");
-  const [tenantId, setTenantId] = useState<string>("");
+  const {
+    selectedTenantId: tenantId,
+    setSelectedTenantId: setTenantId,
+  } = useSelectedTenant();
 
   const [busy, setBusy] = useState(false);
 
-  // ✅ confirm only for DISABLE (one-way)
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [confirmTarget, setConfirmTarget] = useState<{ moduleId: string; moduleName: string } | null>(null);
+  const [confirmTarget, setConfirmTarget] = useState<{
+    moduleId: string;
+    moduleName: string;
+  } | null>(null);
 
   async function loadIndustries() {
     const r = await fetch("/api/core-admin/industries", { cache: "no-store" });
@@ -94,13 +100,31 @@ export default function LicensingPanel() {
   async function loadTenants() {
     const r = await fetch("/api/admin/tenants", { cache: "no-store" });
     const d = await r.json().catch(() => null);
+
     if (!r.ok || !d?.ok) {
-      toast.error("Tenants load failed", { description: d?.error ?? `HTTP ${r.status}` });
+      toast.error("Tenants load failed", {
+        description: d?.error ?? `HTTP ${r.status}`,
+      });
       setTenants([]);
       return;
     }
-    setTenants(d.tenants ?? []);
-    if (!tenantId && d?.tenants?.[0]?.id) setTenantId(d.tenants[0].id);
+
+    const list = d.tenants ?? [];
+    setTenants(list);
+
+    const savedTenantId =
+      typeof window !== "undefined"
+        ? localStorage.getItem("coreAdminSelectedTenantId")
+        : "";
+
+    if (savedTenantId && list.some((t: Tenant) => t.id === savedTenantId)) {
+      setTenantId(savedTenantId);
+      return;
+    }
+
+    if (list[0]?.id) {
+      setTenantId(list[0].id);
+    }
   }
 
   async function loadModulesByIndustry(indId: string) {
@@ -108,49 +132,52 @@ export default function LicensingPanel() {
       setModules([]);
       return;
     }
-    const r = await fetch(`/api/core-admin/modules?industryId=${encodeURIComponent(indId)}`, {
-      cache: "no-store",
-    });
+
+    const r = await fetch(
+      `/api/core-admin/modules?industryId=${encodeURIComponent(indId)}`,
+      { cache: "no-store" }
+    );
     const d = await r.json().catch(() => null);
     setModules((d?.modules ?? []) as ModuleRow[]);
   }
 
   async function loadTenantModules(tid: string, indId: string) {
-  if (!tid || !indId) {
-    setTenantModules([]);
-    return;
+    if (!tid || !indId) {
+      setTenantModules([]);
+      return;
+    }
+
+    const r = await fetch(
+      `/api/admin/tenant-modules?tenantId=${encodeURIComponent(
+        tid
+      )}&industryId=${encodeURIComponent(indId)}`,
+      { cache: "no-store" }
+    );
+
+    const d = await r.json().catch(() => null);
+
+    if (!r.ok || !d?.ok) {
+      toast.error("Licensing load failed", {
+        description: d?.error ?? `HTTP ${r.status}`,
+      });
+      setTenantModules([]);
+      return;
+    }
+
+    setTenantModules(d.tenantModules ?? []);
   }
-
-  const r = await fetch(
-    `/api/admin/tenant-modules?tenantId=${encodeURIComponent(tid)}&industryId=${encodeURIComponent(indId)}`,
-    { cache: "no-store" }
-  );
-
-  const d = await r.json().catch(() => null);
-
-  if (!r.ok || !d?.ok) {
-    toast.error("Licensing load failed", { description: d?.error ?? `HTTP ${r.status}` });
-    setTenantModules([]);
-    return;
-  }
-
-  setTenantModules(d.tenantModules ?? []);
-}
 
   useEffect(() => {
     loadIndustries();
     loadTenants();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     if (industryId) loadModulesByIndustry(industryId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [industryId]);
 
   useEffect(() => {
     if (tenantId && industryId) loadTenantModules(tenantId, industryId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenantId, industryId]);
 
   const tmByModuleId = useMemo(() => {
@@ -162,7 +189,11 @@ export default function LicensingPanel() {
   const rows = useMemo(() => {
     return [...modules]
       .filter((x) => x.industryId === industryId)
-      .sort((a, b) => (a.sortOrder ?? 100) - (b.sortOrder ?? 100) || a.name.localeCompare(b.name))
+      .sort(
+        (a, b) =>
+          (a.sortOrder ?? 100) - (b.sortOrder ?? 100) ||
+          a.name.localeCompare(b.name)
+      )
       .map((mod) => {
         const tm = tmByModuleId.get(mod.id) || null;
 
@@ -192,7 +223,9 @@ export default function LicensingPanel() {
 
       const d = await r.json().catch(() => null);
       if (!r.ok || !d?.ok) {
-        toast.error("Save failed", { description: d?.error ?? `HTTP ${r.status}` });
+        toast.error("Save failed", {
+          description: d?.error ?? `HTTP ${r.status}`,
+        });
         return;
       }
 
@@ -206,8 +239,11 @@ export default function LicensingPanel() {
     await saveRow(moduleId, { seatLimit });
   }
 
-  async function onChangeDates(moduleId: string, startsAt: Date | null, endsAt: Date | null) {
-    // ✅ Active is driven ONLY by dates
+  async function onChangeDates(
+    moduleId: string,
+    startsAt: Date | null,
+    endsAt: Date | null
+  ) {
     const autoStatus = isTodayBetween(startsAt, endsAt) ? "ACTIVE" : "DISABLED";
 
     await saveRow(moduleId, {
@@ -218,25 +254,24 @@ export default function LicensingPanel() {
   }
 
   async function disableByButton(moduleId: string) {
-  const tm = tmByModuleId.get(moduleId) || null;
+    const tm = tmByModuleId.get(moduleId) || null;
 
-  const y = yesterday();
-  const s = tm?.startsAt ? new Date(tm.startsAt) : new Date();
+    const y = yesterday();
+    const s = tm?.startsAt ? new Date(tm.startsAt) : new Date();
 
-  await saveRow(moduleId, {
-    startsAt: s.toISOString(),
-    endsAt: y.toISOString(),
-    status: "DISABLED",
-  });
+    await saveRow(moduleId, {
+      startsAt: s.toISOString(),
+      endsAt: y.toISOString(),
+      status: "DISABLED",
+    });
 
-  toast.success("Module disabled", {
-    description: "The module has been successfully disabled for this tenant.",
-  });
-}
+    toast.success("Module disabled", {
+      description: "The module has been successfully disabled for this tenant.",
+    });
+  }
 
   return (
     <div className="space-y-4 text-white">
-      {/* Filters */}
       <div className="grid grid-cols-12 gap-2 items-center">
         <div className="col-span-12 md:col-span-5 flex items-center gap-2">
           <div className="text-xs text-white/60 w-[70px]">Industry</div>
@@ -271,7 +306,6 @@ export default function LicensingPanel() {
         </div>
       </div>
 
-      {/* Table */}
       <div className="rounded-xl border border-white/10 bg-black/20 overflow-hidden">
         <div className="grid grid-cols-12 gap-2 px-4 py-3 bg-white/[0.04] text-xs uppercase tracking-wider text-white/60">
           <div className="col-span-4">Module</div>
@@ -282,12 +316,8 @@ export default function LicensingPanel() {
         </div>
 
         {rows.map((r, idx) => {
-          const tm = r.tm;
-
           const startVal = toDateInputValue(r.startsAt);
           const endVal = toDateInputValue(r.endsAt);
-
-          // ✅ status shown is derived from dates (and saved on date change)
           const statusLabel = r.derivedActive as "ACTIVE" | "DISABLED";
 
           return (
@@ -345,15 +375,18 @@ export default function LicensingPanel() {
               <div className="col-span-2 flex justify-end">
                 <AdminRowButton
                   onClick={() => {
-                    // ✅ one-way: only ACTIVE can be disabled by click
                     if (statusLabel !== "ACTIVE") {
                       toast.message("Info", {
-                        description: "ACTIVE status se dobija samo promenom datuma (Start/End).",
+                        description:
+                          "ACTIVE status se dobija samo promenom datuma (Start/End).",
                       });
                       return;
                     }
 
-                    setConfirmTarget({ moduleId: r.mod.id, moduleName: r.mod.name });
+                    setConfirmTarget({
+                      moduleId: r.mod.id,
+                      moduleName: r.mod.name,
+                    });
                     setConfirmOpen(true);
                   }}
                   disabled={busy}
@@ -367,11 +400,12 @@ export default function LicensingPanel() {
         })}
 
         {rows.length === 0 && (
-          <div className="p-4 text-sm text-white/60">No modules for selected Industry.</div>
+          <div className="p-4 text-sm text-white/60">
+            No modules for selected Industry.
+          </div>
         )}
       </div>
 
-      {/* ✅ Confirm dialog */}
       <AlertDialog
         open={confirmOpen}
         onOpenChange={(open) => {
@@ -383,9 +417,11 @@ export default function LicensingPanel() {
           <AlertDialogHeader>
             <AlertDialogTitle>Disable module?</AlertDialogTitle>
             <AlertDialogDescription className="text-white/70">
-              Do you want to disable <b className="text-white">{confirmTarget?.moduleName}</b> for this tenant?
+              Do you want to disable{" "}
+              <b className="text-white">{confirmTarget?.moduleName}</b> for this
+              tenant?
               <br />
-                          </AlertDialogDescription>
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel className="border border-white/15 bg-white/5 text-white hover:bg-white/10">
