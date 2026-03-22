@@ -53,9 +53,9 @@ export default async function CoreAppLayout({
 
   const lic = await checkUserLicense(user.email);
 
-  const nav = tenantId
-    ? await getPortalNavForUserTenant(user.id, tenantId)
-    : [];
+  const { nav } = tenantId
+  ? await getPortalNavForUserTenant(user.id, tenantId)
+  : { nav: [] };
 
   const groups = nav
     .map((g: any) => ({

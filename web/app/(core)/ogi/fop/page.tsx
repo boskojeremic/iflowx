@@ -10,6 +10,7 @@ import { FOP_REPORT_META } from "@/lib/fop-report-meta";
 import SendReportDialog from "@/components/fop/SendReportDialog";
 import ReportAndDateFilters from "@/components/fop/ReportAndDateFilters";
 import InsertGenerateButton from "@/components/fop/InsertGenerateButton";
+import { getAccessibleReportsForUser } from "@/lib/report-list-access";
 
 export const dynamic = "force-dynamic";
 
@@ -44,7 +45,6 @@ export default async function FieldOperationsPage({
   const sp = await searchParams;
 
   const previewTs = String(sp?._ts ?? "");
-
   const mainTab = String(sp?.tab ?? "data-entry").toLowerCase();
   const rightTab = String(sp?.rightTab ?? "charts").toLowerCase();
   const selectedReportCode = String(sp?.report ?? "").toUpperCase();
@@ -65,17 +65,17 @@ export default async function FieldOperationsPage({
   if (!moduleItem) notFound();
 
   const reportGroup = await db.reportGroup.findFirst({
-  where: {
-    moduleId: moduleItem.id,
-    isActive: true,
-  },
-  orderBy: [{ sortOrder: "asc" }],
-  select: {
-    id: true,
-    code: true,
-    name: true,
-  },
-});
+    where: {
+      moduleId: moduleItem.id,
+      isActive: true,
+    },
+    orderBy: [{ sortOrder: "asc" }],
+    select: {
+      id: true,
+      code: true,
+      name: true,
+    },
+  });
 
   if (!reportGroup) notFound();
 
@@ -124,28 +124,57 @@ export default async function FieldOperationsPage({
     { key: "report-event-history", label: "Report Event History" },
   ];
 
-  const dataEntryReports = await db.reportDefinition.findMany({
-    where: {
-      isActive: true,
-      reportGroupId: reportGroup.id,
-    },
-    orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
-    select: {
-      id: true,
-      code: true,
-      name: true,
-      description: true,
-      sortOrder: true,
-      reportGroupId: true,
-    },
-  });
+  const accessibleReports = tenant
+    ? await getAccessibleReportsForUser({
+        userId: user.id,
+        tenantId: tenant.id,
+      })
+    : [];
+
+  const dataEntryReports = accessibleReports
+    .filter((r) => r.reportGroupId === reportGroup.id)
+    .map((r, idx) => ({
+      id: r.id,
+      code: r.code,
+      name: r.name,
+      description: null as string | null,
+      sortOrder: idx + 1,
+      reportGroupId: r.reportGroupId,
+      responsibleFunctionId: r.responsibleFunctionId,
+      approverFunctionId: r.approverFunctionId,
+      mode: r.mode,
+      canView: r.canView,
+      canEdit: r.canEdit,
+      canSubmit: r.canSubmit,
+      canApprove: r.canApprove,
+    }));
+
+  const accessibleReportCodes = new Set(dataEntryReports.map((r) => r.code));
 
   const activeDataEntryReport =
     dataEntryReports.find((r) => r.code === selectedReportCode) ??
     dataEntryReports[0] ??
     null;
 
-  const approvedReports = tenant
+  if (mainTab === "data-entry" && dataEntryReports.length === 0) {
+    return (
+      <div className="p-4 space-y-4 min-h-full overflow-y-auto">
+        <div className="text-sm text-white/50">
+          <Link href="/ogi/fop" className="hover:text-white/80 transition">
+            Field Operations
+          </Link>
+          <span className="mx-2">/</span>
+          <span className="text-white/80">FOP Entry Form</span>
+        </div>
+
+        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 text-sm text-white/70">
+          You do not have access to any reports in this report group.
+        </div>
+      </div>
+    );
+  }
+
+  const approvedReportsRaw = tenant
     ? await db.reportDayStatus.findMany({
         where: {
           tenantId: tenant.id,
@@ -183,6 +212,10 @@ export default async function FieldOperationsPage({
       })
     : [];
 
+  const approvedReports = approvedReportsRaw.filter((r) =>
+    accessibleReportCodes.has(r.ReportDefinition.code)
+  );
+
   const activeApprovedReport =
     approvedReports.find((r) => r.ReportDefinition.code === selectedReportCode) ??
     approvedReports[0] ??
@@ -200,12 +233,60 @@ export default async function FieldOperationsPage({
     status: "DRAFT",
     blocked: false,
     sortOrder: r.sortOrder ?? idx + 1,
+    responsibleFunctionId: r.responsibleFunctionId,
+    approverFunctionId: r.approverFunctionId,
+    mode: r.mode,
+    canView: r.canView,
+    canEdit: r.canEdit,
+    canSubmit: r.canSubmit,
+    canApprove: r.canApprove,
   }));
 
   const activeReport =
     reportRows.find((r) => r.code === (activeDataEntryReport?.code ?? "")) ??
     reportRows[0] ??
     null;
+
+  const canEditActiveReport = !!activeReport?.canEdit;
+  const canSubmitActiveReport = !!activeReport?.canSubmit;
+  const canApproveActiveReport = !!activeReport?.canApprove;
+  const activeReportMode = activeReport?.mode ?? "NONE";
+
+  const approverCandidatesRaw =
+    tenant && activeReport?.approverFunctionId
+      ? await db.membership.findMany({
+          where: {
+            tenantId: tenant.id,
+            status: "ACTIVE",
+            operationalFunctionId: activeReport.approverFunctionId,
+          },
+          select: {
+            userId: true,
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+              },
+            },
+          },
+          orderBy: {
+            createdAt: "asc",
+          },
+        })
+      : [];
+
+  const approverCandidates = approverCandidatesRaw
+    .map((m) => ({
+      userId: m.user.id,
+      label: m.user.name?.trim() || m.user.email,
+      email: m.user.email,
+    }))
+    .sort((a, b) =>
+      a.label.localeCompare(b.label, undefined, { sensitivity: "base" })
+    );
+
+  const defaultApproverUserId = approverCandidates[0]?.userId ?? "";
 
   const manualData = [
     {
@@ -320,19 +401,25 @@ export default async function FieldOperationsPage({
   };
 
   const activePreviewCode =
-  activeDataEntryReport?.code ??
-  activeApprovedReport?.ReportDefinition.code ??
-  "DOR";
+    activeDataEntryReport?.code ??
+    activeApprovedReport?.ReportDefinition.code ??
+    "DOR";
 
-const activePreviewMeta =
-  FOP_REPORT_META[activePreviewCode as keyof typeof FOP_REPORT_META] ??
-  FOP_REPORT_META.DOR;
+  const activePreviewMeta =
+    FOP_REPORT_META[activePreviewCode as keyof typeof FOP_REPORT_META] ??
+    FOP_REPORT_META.DOR;
 
-const activePreviewPdfSrc = `/api/fop/pdf/${activePreviewCode}_${selectedDate}.pdf${previewTs ? `?ts=${previewTs}` : ""}`;
+  const activePreviewPdfSrc = `/api/fop/pdf/${activePreviewCode}_${selectedDate}.pdf${
+    previewTs ? `?ts=${previewTs}` : ""
+  }`;
 
-  const baseQuery = `report=${
-    activeDataEntryReport?.code ?? activeApprovedReport?.ReportDefinition.code ?? ""
-  }&date=${selectedDate}`;
+  const currentReportCode =
+    activeDataEntryReport?.code ??
+    activeApprovedReport?.ReportDefinition.code ??
+    dataEntryReports[0]?.code ??
+    "";
+
+  const baseQuery = `report=${currentReportCode}&date=${selectedDate}`;
 
   return (
     <div className="p-4 space-y-4 min-h-full overflow-y-auto">
@@ -370,22 +457,30 @@ const activePreviewPdfSrc = `/api/fop/pdf/${activePreviewCode}_${selectedDate}.p
             <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
               <div className="text-3xl font-bold">
                 Welcome,
-                <span className="text-white/70">{user.name ? ` ${user.name}` : ""}</span>
+                <span className="text-white/70">
+                  {user.name ? ` ${user.name}` : ""}
+                </span>
+              </div>
+
+              <div className="mt-2 text-xs">
+                <span className="rounded bg-white/10 px-2 py-1">
+                  Mode: {activeReportMode}
+                </span>
               </div>
 
               <div className="mt-4 rounded-xl border border-white/10 bg-black/20 p-3">
-  <ReportAndDateFilters
-    reports={dataEntryReports.map((r) => ({
-      id: r.id,
-      code: r.code,
-      name: r.name,
-    }))}
-    selectedReportCode={activeDataEntryReport?.code ?? ""}
-    selectedDate={selectedDate}
-    mainTab={mainTab}
-    rightTab={rightTab}
-  />
-</div>
+                <ReportAndDateFilters
+                  reports={dataEntryReports.map((r) => ({
+                    id: r.id,
+                    code: r.code,
+                    name: r.name,
+                  }))}
+                  selectedReportCode={activeDataEntryReport?.code ?? ""}
+                  selectedDate={selectedDate}
+                  mainTab={mainTab}
+                  rightTab={rightTab}
+                />
+              </div>
 
               <div className="mt-4 grid gap-3 md:grid-cols-2">
                 <div className="rounded-xl border border-white/10 bg-black/20 p-4 text-center">
@@ -393,7 +488,9 @@ const activePreviewPdfSrc = `/api/fop/pdf/${activePreviewCode}_${selectedDate}.p
                     Submitted Reports
                   </div>
                   <div className="mt-2 text-4xl font-semibold">0</div>
-                  <div className="mt-1 text-sm text-white/60">Waiting for Validation</div>
+                  <div className="mt-1 text-sm text-white/60">
+                    Waiting for Validation
+                  </div>
                 </div>
 
                 <div className="rounded-xl border border-white/10 bg-black/20 p-4 text-center">
@@ -401,32 +498,74 @@ const activePreviewPdfSrc = `/api/fop/pdf/${activePreviewCode}_${selectedDate}.p
                     Rejected Reports
                   </div>
                   <div className="mt-2 text-4xl font-semibold">0</div>
-                  <div className="mt-1 text-sm text-white/60">Rejected Reports</div>
+                  <div className="mt-1 text-sm text-white/60">
+                    Rejected Reports
+                  </div>
                 </div>
               </div>
 
               <div className="mt-4 rounded-xl border border-white/10 bg-black/20 p-3">
                 <div className="grid gap-3 md:grid-cols-[1fr_auto] items-end">
                   <div>
-                    <div className="text-sm font-medium">Select Validator</div>
-                    <select className="mt-2 w-full rounded-md border border-white/10 bg-black/30 px-3 py-2 text-sm">
-                      <option>Oleg Dedeiko</option>
+                    <div className="text-sm font-medium">Select Approver</div>
+                    <select
+                      disabled={!canEditActiveReport || approverCandidates.length === 0}
+                      defaultValue={defaultApproverUserId}
+                      className="mt-2 w-full rounded-md border border-white/10 bg-black/30 px-3 py-2 text-sm disabled:opacity-50"
+                    >
+                      {approverCandidates.length === 0 ? (
+                        <option value="">No dedicated approver found</option>
+                      ) : (
+                        approverCandidates.map((a) => (
+                          <option key={a.userId} value={a.userId}>
+                            {a.label}
+                          </option>
+                        ))
+                      )}
                     </select>
                   </div>
 
                   <div className="flex gap-2">
-                    <InsertGenerateButton
-  reportCode={activePreviewCode}
-  reportDate={selectedDate}
-/>
-                    <button className="rounded-md border border-blue-500/20 bg-blue-500/10 px-4 py-2 text-sm text-blue-300 hover:bg-blue-500/15 transition">
-                      Submit
-                    </button>
+                    {canEditActiveReport && (
+                      <InsertGenerateButton
+                        reportCode={activePreviewCode}
+                        reportDate={selectedDate}
+                      />
+                    )}
+
+                    {canSubmitActiveReport && (
+                      <button className="rounded-md border border-blue-500/20 bg-blue-500/10 px-4 py-2 text-sm text-blue-300 hover:bg-blue-500/15 transition">
+                        Submit
+                      </button>
+                    )}
+
+                    {canApproveActiveReport && (
+                      <button className="rounded-md border border-emerald-500/20 bg-emerald-500/10 px-4 py-2 text-sm text-emerald-300 hover:bg-emerald-500/15 transition">
+                        Approve
+                      </button>
+                    )}
                   </div>
                 </div>
 
                 <div className="mt-2 text-xs text-white/45">
-                  You cannot modify report that is already sent for approval.
+                  {activeReportMode === "RESPONSIBLE" &&
+                    approverCandidates.length > 0 &&
+                    `Dedicated approvers available: ${approverCandidates
+                      .map((a) => a.label)
+                      .join(", ")}.`}
+
+                  {activeReportMode === "RESPONSIBLE" &&
+                    approverCandidates.length === 0 &&
+                    "No dedicated approver is assigned to this report."}
+
+                  {activeReportMode === "APPROVER" &&
+                    "You can review and approve this report, but you cannot enter data."}
+
+                  {activeReportMode === "OWNER" &&
+                    "You have owner visibility. Edit/approve actions still depend on your operational assignment."}
+
+                  {activeReportMode === "NONE" &&
+                    "You do not have workflow permissions for this report."}
                 </div>
               </div>
             </div>
@@ -436,7 +575,9 @@ const activePreviewPdfSrc = `/api/fop/pdf/${activePreviewCode}_${selectedDate}.p
                 <div className="text-sm font-semibold uppercase tracking-wide text-white/50">
                   Reports
                 </div>
-                <div className="mt-1 text-sm text-white/45">Please, select report:</div>
+                <div className="mt-1 text-sm text-white/45">
+                  Please, select report:
+                </div>
 
                 <div className="mt-3 overflow-x-auto">
                   <table className="w-full min-w-[760px] text-sm">
@@ -448,31 +589,67 @@ const activePreviewPdfSrc = `/api/fop/pdf/${activePreviewCode}_${selectedDate}.p
                       </tr>
                     </thead>
                     <tbody>
-                      {activeReport && (
-                        <tr className="border-b border-white/10 bg-white/5">
-                          <td className="px-3 py-3">{activeReport.name}</td>
-                          <td className="px-3 py-3">{activeReport.documentNumber}</td>
-                          <td className="px-3 py-3">{activeReport.revisionNo}</td>
-                        </tr>
-                      )}
+                      {reportRows.map((r) => {
+                        const isActive = r.code === activeReport?.code;
+
+                        return (
+                          <tr
+                            key={r.id}
+                            className={[
+                              "border-b border-white/10",
+                              isActive && "ring-1 ring-blue-500/40",
+                              r.mode === "RESPONSIBLE" && "bg-blue-500/10",
+                              r.mode === "APPROVER" && "bg-emerald-500/10",
+                              r.mode === "OWNER" && "bg-cyan-500/10",
+                              r.mode === "NONE" && "bg-white/5",
+                            ]
+                              .filter(Boolean)
+                              .join(" ")}
+                          >
+                            <td className="px-3 py-3">{r.name}</td>
+                            <td className="px-3 py-3">{r.documentNumber}</td>
+                            <td className="px-3 py-3">{r.revisionNo}</td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
               </div>
 
-              <DataSection
-                title="Manual Data Entry"
-                note="Double click on the highlighted cell to insert data:"
-              >
-                <SimpleTable rows={manualData} />
-              </DataSection>
+              {canEditActiveReport ? (
+                <>
+                  <DataSection
+                    title="Manual Data Entry"
+                    note="Double click on the highlighted cell to insert data:"
+                  >
+                    <SimpleTable rows={manualData} />
+                  </DataSection>
 
-              <DataSection
-                title="SCADA Reading"
-                note="Double click on the highlighted cell to correct value:"
-              >
-                <SimpleTable rows={scadaData} />
-              </DataSection>
+                  <DataSection
+                    title="SCADA Reading"
+                    note="Double click on the highlighted cell to correct value:"
+                  >
+                    <SimpleTable rows={scadaData} />
+                  </DataSection>
+                </>
+              ) : (
+                <>
+                  <DataSection
+                    title="Manual Data Entry (Read Only)"
+                    note="You do not have permission to edit this report."
+                  >
+                    <SimpleTable rows={manualData} />
+                  </DataSection>
+
+                  <DataSection
+                    title="SCADA Reading (Read Only)"
+                    note="You do not have permission to edit this report."
+                  >
+                    <SimpleTable rows={scadaData} />
+                  </DataSection>
+                </>
+              )}
             </div>
           </div>
 
@@ -497,8 +674,8 @@ const activePreviewPdfSrc = `/api/fop/pdf/${activePreviewCode}_${selectedDate}.p
               })}
             </div>
 
-            <div className="p-4 min-h-[900px]">
-              {rightTab === "charts" && (
+<div className="p-4 h-full flex flex-col">
+                {rightTab === "charts" && (
                 <div className="space-y-5">
                   <div className="grid gap-4 md:grid-cols-2">
                     <button className="rounded-full bg-white/10 px-4 py-3 text-sm font-semibold">
@@ -540,19 +717,19 @@ const activePreviewPdfSrc = `/api/fop/pdf/${activePreviewCode}_${selectedDate}.p
                     </div>
 
                     <SendReportDialog
-  reportCode={activePreviewCode}
-  reportTitle={activePreviewMeta.title}
-  reportDate={selectedDate}
-  pdfUrl={activePreviewPdfSrc}
-/>
+                      reportCode={activePreviewCode}
+                      reportTitle={activePreviewMeta.title}
+                      reportDate={selectedDate}
+                      pdfUrl={activePreviewPdfSrc}
+                    />
                   </div>
 
                   <div className="rounded-xl border border-white/10 bg-black/20 p-3">
-                   <ReportView
-  pdfSrc={activePreviewPdfSrc}
-  title={activePreviewMeta.title}
-  reportDate={selectedDate}
-/> 
+                    <ReportView
+                      pdfSrc={activePreviewPdfSrc}
+                      title={activePreviewMeta.title}
+                      reportDate={selectedDate}
+                    />
                   </div>
                 </div>
               )}
@@ -573,17 +750,27 @@ const activePreviewPdfSrc = `/api/fop/pdf/${activePreviewCode}_${selectedDate}.p
                     <tbody>
                       {reportRows.map((r) => {
                         const highlight = r.code === activeReport?.code;
+
                         return (
                           <tr
                             key={r.id}
                             className={[
                               "border-b border-white/10",
-                              highlight ? "bg-red-500/20 text-red-300 font-semibold" : "bg-white/5",
-                            ].join(" ")}
+                              highlight &&
+                                "text-white font-semibold ring-1 ring-blue-500/40",
+                              r.mode === "RESPONSIBLE" && "bg-blue-500/10",
+                              r.mode === "APPROVER" && "bg-emerald-500/10",
+                              r.mode === "OWNER" && "bg-cyan-500/10",
+                              r.mode === "NONE" && "bg-white/5",
+                            ]
+                              .filter(Boolean)
+                              .join(" ")}
                           >
                             <td className="px-3 py-3">{selectedDate}</td>
                             <td className="px-3 py-3">{r.name}</td>
-                            <td className="px-3 py-3">{r.status.toLowerCase()}</td>
+                            <td className="px-3 py-3">
+                              {r.status.toLowerCase()} / {r.mode.toLowerCase()}
+                            </td>
                             <td className="px-3 py-3">{r.responsiblePerson}</td>
                             <td className="px-3 py-3">{r.validator}</td>
                             <td className="px-3 py-3">{r.accountant}</td>
@@ -609,7 +796,10 @@ const activePreviewPdfSrc = `/api/fop/pdf/${activePreviewCode}_${selectedDate}.p
                     </thead>
                     <tbody>
                       {eventHistory.map((e, idx) => (
-                        <tr key={idx} className="border-b border-white/10 bg-white/5">
+                        <tr
+                          key={idx}
+                          className="border-b border-white/10 bg-white/5"
+                        >
                           <td className="px-3 py-3">{e.eventDate}</td>
                           <td className="px-3 py-3">{e.stage}</td>
                           <td className="px-3 py-3">{e.sentFrom}</td>
@@ -784,10 +974,10 @@ const activePreviewPdfSrc = `/api/fop/pdf/${activePreviewCode}_${selectedDate}.p
             <div className="rounded-xl border border-white/10 bg-black/20 p-3">
               <div className="mb-3 text-sm font-medium">PDF Output Preview</div>
               <ReportView
-  pdfSrc={activePreviewPdfSrc}
-  title={activePreviewMeta.title}
-  reportDate={selectedDate}
-/>
+                pdfSrc={activePreviewPdfSrc}
+                title={activePreviewMeta.title}
+                reportDate={selectedDate}
+              />
             </div>
           )}
         </div>

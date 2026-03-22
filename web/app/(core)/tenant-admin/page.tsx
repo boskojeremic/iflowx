@@ -17,6 +17,8 @@ const tabs = [
 
 type SearchParams = Promise<{
   tab?: string;
+  moduleId?: string;
+  reportGroupId?: string;
 }>;
 
 export const dynamic = "force-dynamic";
@@ -73,6 +75,17 @@ export default async function TenantAdminPage({
     },
   });
 
+  function buildTabHref(nextTab: string) {
+    const qs = new URLSearchParams();
+
+    qs.set("tab", nextTab);
+
+    if (sp?.moduleId) qs.set("moduleId", sp.moduleId);
+    if (sp?.reportGroupId) qs.set("reportGroupId", sp.reportGroupId);
+
+    return `/tenant-admin?${qs.toString()}`;
+  }
+
   return (
     <div className="space-y-6 p-6">
       <div>
@@ -89,7 +102,7 @@ export default async function TenantAdminPage({
           return (
             <Link
               key={t.key}
-              href={`/tenant-admin?tab=${t.key}`}
+              href={buildTabHref(t.key)}
               className={`px-4 py-2 rounded-md border text-sm font-medium transition ${
                 active
                   ? "bg-blue-600 text-white border-blue-500"

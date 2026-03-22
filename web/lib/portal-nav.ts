@@ -1,6 +1,5 @@
-// lib/portal-nav.ts
 import { db } from "@/lib/db";
-import type { MemberRole } from "@prisma/client";
+import { canManageTenantAdmin, canSeeMasterDataAdmin } from "@/lib/report-permissions";
 
 export type PortalNavItem = {
   industryCode: string;
@@ -14,16 +13,22 @@ export type PortalNavItem = {
   }[];
 };
 
-function isWithinWindow(now: Date, start: Date | null, end: Date | null) {
-  if (start && start > now) return false;
-  if (end && end < now) return false;
-  return true;
-}
+export type PortalAdminLinks = {
+  showTenantAdmin: boolean;
+  showMasterDataAdmin: boolean;
+};
 
-export async function getPortalNavForUserTenant(userId: string, tenantId: string) {
+export type PortalNavResult = {
+  nav: PortalNavItem[];
+  adminLinks: PortalAdminLinks;
+};
+
+export async function getPortalNavForUserTenant(
+  userId: string,
+  tenantId: string
+): Promise<PortalNavResult> {
   const now = new Date();
 
-  // 1) Membership gate (ACTIVE + access window)
   const membership = await db.membership.findFirst({
     where: {
       userId,
@@ -32,12 +37,24 @@ export async function getPortalNavForUserTenant(userId: string, tenantId: string
       OR: [{ accessStartsAt: null }, { accessStartsAt: { lte: now } }],
       AND: [{ OR: [{ accessEndsAt: null }, { accessEndsAt: { gte: now } }] }],
     },
-    select: { id: true, role: true, accessStartsAt: true, accessEndsAt: true },
+    select: {
+      id: true,
+      role: true,
+      accessStartsAt: true,
+      accessEndsAt: true,
+    },
   });
 
-  if (!membership) return [];
+  if (!membership) {
+    return {
+      nav: [],
+      adminLinks: {
+        showTenantAdmin: false,
+        showMasterDataAdmin: false,
+      },
+    };
+  }
 
-  // 2) Tenant modules gate (ACTIVE + window + module active)
   const tms = await db.tenantModule.findMany({
     where: {
       tenantId,
@@ -68,7 +85,6 @@ export async function getPortalNavForUserTenant(userId: string, tenantId: string
     },
   });
 
-  // 3) Group by industry, filter routePath
   const grouped = new Map<string, PortalNavItem>();
 
   for (const row of tms) {
@@ -97,14 +113,23 @@ export async function getPortalNavForUserTenant(userId: string, tenantId: string
     });
   }
 
-  // 4) Sort modules + industries, drop empty groups
   const nav = Array.from(grouped.values())
     .map((g) => ({
       ...g,
       modules: g.modules.sort((a, b) => a.sortOrder - b.sortOrder),
     }))
     .filter((g) => g.modules.length > 0)
-    .sort((a, b) => a.industrySort - b.industrySort || a.industryName.localeCompare(b.industryName));
+    .sort(
+      (a, b) =>
+        a.industrySort - b.industrySort ||
+        a.industryName.localeCompare(b.industryName)
+    );
 
-  return nav;
+  return {
+    nav,
+    adminLinks: {
+      showTenantAdmin: canManageTenantAdmin(membership.role),
+      showMasterDataAdmin: canSeeMasterDataAdmin(membership.role),
+    },
+  };
 }

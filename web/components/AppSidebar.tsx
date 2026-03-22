@@ -26,7 +26,15 @@ export default async function AppSidebar({
   showTenantAdmin: boolean;
   showMasterDataAdmin: boolean;
 }) {
-  const nav = tenantId ? await getPortalNavForUserTenant(userId, tenantId) : [];
+const { nav, adminLinks } = tenantId
+  ? await getPortalNavForUserTenant(userId, tenantId)
+  : {
+      nav: [],
+      adminLinks: {
+        showTenantAdmin: false,
+        showMasterDataAdmin: false,
+      },
+    };
 
   const groups: SidebarGroupData[] = nav
     .map((g: any) => ({
@@ -44,10 +52,10 @@ export default async function AppSidebar({
 
   return (
     <AppSidebarHydrationSafe
-      groups={groups}
-      showCoreAdmin={showCoreAdmin}
-      showTenantAdmin={showTenantAdmin}
-      showMasterDataAdmin={showMasterDataAdmin}
-    />
+  groups={groups}
+  showCoreAdmin={showCoreAdmin}
+  showTenantAdmin={adminLinks.showTenantAdmin}
+  showMasterDataAdmin={adminLinks.showMasterDataAdmin}
+/>
   );
 }

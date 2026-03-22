@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 
 type Tenant = {
@@ -59,6 +60,13 @@ function safeJson(text: string) {
 }
 
 export default function ReportAssignmentsPanel() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  const urlModuleId = searchParams?.get("moduleId") ?? "";
+  const urlReportGroupId = searchParams?.get("reportGroupId") ?? "";
+
   const [tenant, setTenant] = useState<Tenant | null>(null);
   const [modules, setModules] = useState<ModuleOption[]>([]);
   const [reportGroups, setReportGroups] = useState<ReportGroupOption[]>([]);
@@ -67,8 +75,9 @@ export default function ReportAssignmentsPanel() {
     OperationalFunctionOption[]
   >([]);
 
-  const [selectedModuleId, setSelectedModuleId] = useState("");
-  const [selectedReportGroupId, setSelectedReportGroupId] = useState("");
+  const [selectedModuleId, setSelectedModuleId] = useState(urlModuleId);
+  const [selectedReportGroupId, setSelectedReportGroupId] =
+    useState(urlReportGroupId);
 
   const [licenseSummary, setLicenseSummary] = useState<LicenseSummary>({
     seatLimit: 0,
@@ -90,6 +99,20 @@ export default function ReportAssignmentsPanel() {
   const validUntilLabel = licenseSummary.validUntil
     ? new Date(licenseSummary.validUntil).toLocaleDateString()
     : "No Expiry";
+
+  function setQueryValues(moduleId: string, reportGroupId: string) {
+    const qs = new URLSearchParams(searchParams?.toString() ?? "");
+
+    if (moduleId) qs.set("moduleId", moduleId);
+    else qs.delete("moduleId");
+
+    if (reportGroupId) qs.set("reportGroupId", reportGroupId);
+    else qs.delete("reportGroupId");
+
+    if (!qs.get("tab")) qs.set("tab", "report-assignments");
+
+    router.replace(`${pathname}?${qs.toString()}`, { scroll: false });
+  }
 
   function buildQuery(moduleId?: string, reportGroupId?: string) {
     const qs = new URLSearchParams();
@@ -190,6 +213,8 @@ export default function ReportAssignmentsPanel() {
       validUntil: null,
     });
 
+    setQueryValues(moduleId, "");
+
     await loadData({
       moduleId,
       reportGroupId: "",
@@ -200,6 +225,8 @@ export default function ReportAssignmentsPanel() {
 
   async function handleGroupChange(reportGroupId: string) {
     setSelectedReportGroupId(reportGroupId);
+    setQueryValues(selectedModuleId, reportGroupId);
+
     await loadData({
       moduleId: selectedModuleId,
       reportGroupId,
@@ -278,8 +305,17 @@ export default function ReportAssignmentsPanel() {
   }
 
   useEffect(() => {
-    void loadData({ silent: true });
-  }, []);
+    setSelectedModuleId(urlModuleId);
+    setSelectedReportGroupId(urlReportGroupId);
+    void loadData({
+      moduleId: urlModuleId,
+      reportGroupId: urlReportGroupId,
+      silent: true,
+      preserveModule: true,
+      preserveGroup: true,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlModuleId, urlReportGroupId]);
 
   return (
     <div className="space-y-4">

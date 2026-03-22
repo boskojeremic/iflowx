@@ -18,26 +18,26 @@ model Tenant {
   apiKeys                   ApiKey[]
   assets                    Asset[]
   assetTypes                AssetType[]
-  CalculatedResult          CalculatedResult[]
+  calculatedResults         CalculatedResult[]
   results                   EmissionResult[]
   emitters                  Emitter[]
-  Site                      Site[]
-  Facility                  Facility[]
+  sites                     Site[]
+  facilities                Facility[]
   inputs                    GHGInput[]
   invites                   Invite[]
   observations              Observation[]
-  points                    MeasurementPoint[]
   readings                  MeasurementReading[]
   members                   Membership[]
-  ReportDayStatus           ReportDayStatus[]
-  ReportAssignment          ReportAssignment[]
-  ReportRun                 ReportRun[]
+  reportDayStatuses         ReportDayStatus[]
+  reportAssignments         ReportAssignment[]
+  reportRuns                ReportRun[]
   periods                   ReportingPeriod[]
   tenantIndustries          TenantIndustry[]
   tenantModules             TenantModule[]
-  TenantReportDefault       TenantReportDefault[]
+  tenantReportDefaults      TenantReportDefault[]
   operationalFunctions      OperationalFunction[]
   reportFunctionAssignments TenantReportFunctionAssignment[]
+  measurementPoints         MeasurementPoint[]
 }
 
 model User {
@@ -152,8 +152,8 @@ model Asset {
   updatedAt DateTime @updatedAt
 
   tenant    Tenant    @relation(fields: [tenantId], references: [id])
-  Facility  Facility  @relation(fields: [facilityId], references: [id])
-  AssetType AssetType @relation(fields: [assetTypeId], references: [id])
+  facility  Facility  @relation(fields: [facilityId], references: [id])
+  assetType AssetType @relation(fields: [assetTypeId], references: [id])
 
   parentAsset Asset?  @relation("AssetToAsset", fields: [parentAssetId], references: [id])
   childAssets Asset[] @relation("AssetToAsset")
@@ -189,23 +189,22 @@ model ReportingPeriod {
 }
 
 model Emitter {
-  id        String             @id @default(cuid())
+  id        String           @id @default(cuid())
   tenantId  String
   assetId   String
   name      String
   scope     ScopeType
   category  String?
   unit      String
-  strategy  EmitterStrategy    @default(CALCULATED_FROM_ACTIVITY)
+  strategy  EmitterStrategy  @default(CALCULATED_FROM_ACTIVITY)
   tag       String?
-  isActive  Boolean            @default(true)
-  createdAt DateTime           @default(now())
-  updatedAt DateTime           @updatedAt
+  isActive  Boolean          @default(true)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
   results   EmissionResult[]
-  asset     Asset              @relation(fields: [assetId], references: [id])
-  tenant    Tenant             @relation(fields: [tenantId], references: [id])
+  asset     Asset            @relation(fields: [assetId], references: [id])
+  tenant    Tenant           @relation(fields: [tenantId], references: [id])
   inputs    GHGInput[]
-  points    MeasurementPoint[]
 
   @@unique([tenantId, assetId, name])
   @@index([tenantId])
@@ -280,26 +279,182 @@ model ApiKey {
 }
 
 model MeasurementPoint {
-  id        String               @id @default(cuid())
-  tenantId  String
-  assetId   String
-  emitterId String?
-  name      String
-  pointType PointType
-  tag       String
-  unit      String
-  isActive  Boolean              @default(true)
-  createdAt DateTime             @default(now())
-  updatedAt DateTime             @updatedAt
-  asset     Asset                @relation(fields: [assetId], references: [id])
-  emitter   Emitter?             @relation(fields: [emitterId], references: [id])
-  tenant    Tenant               @relation(fields: [tenantId], references: [id])
-  readings  MeasurementReading[]
+  id         String  @id @default(cuid())
+  tenantId   String
+  facilityId String?
+  assetId    String?
 
-  @@unique([tenantId, assetId, tag])
+  insertDt  DateTime  @default(now())
+  createdBy String
+  updateDt  DateTime  @updatedAt
+  updEndDt  DateTime?
+  updatedBy String
+
+  tagNo      String
+  mpSourceId Int
+
+  descEn String?
+  descRu String?
+
+  procInstDiagName      String?
+  ioListTag             String?
+  sourceTag             String?
+  controllerPrimTag     String?
+  controllerSecTag      String?
+  consumerTag           String?
+  commModulePrimAddress String?
+  commModuleSecAddress  String?
+  rack                  String?
+  slot                  String?
+  channel               String?
+  signalType            String?
+  hmiAssociatedDisplay  String?
+
+  measurementUnitId     Int?
+  storageMovementId     Int?
+  mpDataTypeId          Int?
+  measurementVariableId Int?
+
+  lastValueFloat Float?
+  lastValueInt   Int?
+  lastValueText  String?
+
+  minimumEu     Float?
+  maximumEu     Float?
+  lowValue      Float?
+  highValue     Float?
+  lowLowValue   Float?
+  highHighValue Float?
+
+  mpTagTypeId      Int?
+  wellDefinitionId Int?
+  reservoirId      Int?
+
+  haveDefault Boolean @default(false)
+  longitude   Float?
+  latitude    Float?
+  sensorIsOff Boolean @default(false)
+  isActive    Boolean @default(true)
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  facility Facility? @relation(fields: [facilityId], references: [id])
+  asset    Asset?    @relation(fields: [assetId], references: [id])
+
+  mpSource            MpSource             @relation(fields: [mpSourceId], references: [id])
+  measurementVariable MeasurementVariable? @relation(fields: [measurementVariableId], references: [id])
+  mpDataType          MpDataType?          @relation(fields: [mpDataTypeId], references: [id])
+  measurementUnit     MeasurementUnit?     @relation(fields: [measurementUnitId], references: [id])
+  mpTagType           MpTagType?           @relation(fields: [mpTagTypeId], references: [id])
+  storageMovement     StorageMovement?     @relation(fields: [storageMovementId], references: [id])
+
+  readings MeasurementReading[]
+
+  @@unique([tenantId, tagNo])
   @@index([tenantId])
+  @@index([facilityId])
   @@index([assetId])
-  @@index([emitterId])
+  @@index([mpSourceId])
+  @@index([measurementVariableId])
+  @@index([measurementUnitId])
+  @@index([mpDataTypeId])
+  @@index([mpTagTypeId])
+  @@index([storageMovementId])
+  @@map("measurement_points")
+}
+
+model MpTagType {
+  id        Int       @id @default(autoincrement())
+  insertDt  DateTime  @default(now())
+  createdBy String
+  updateDt  DateTime  @updatedAt
+  updEndDt  DateTime?
+  updatedBy String
+
+  tagTypeName String? @unique
+
+  measurementPoints MeasurementPoint[]
+
+  @@map("mp_tag_types")
+}
+
+model StorageMovement {
+  id        Int       @id @default(autoincrement())
+  insertDt  DateTime  @default(now())
+  createdBy String
+  updateDt  DateTime  @updatedAt
+  updEndDt  DateTime?
+  updatedBy String
+
+  storageMovementName String @unique
+
+  measurementPoints MeasurementPoint[]
+
+  @@map("storage_movements")
+}
+
+model MpSource {
+  id        Int       @id @default(autoincrement())
+  insertDt  DateTime  @default(now())
+  createdBy String
+  updateDt  DateTime  @updatedAt
+  updEndDt  DateTime?
+  updatedBy String
+
+  sourceName String @unique
+
+  measurementPoints MeasurementPoint[]
+
+  @@map("mp_sources")
+}
+
+model MeasurementVariable {
+  id        Int       @id @default(autoincrement())
+  insertDt  DateTime  @default(now())
+  createdBy String
+  updateDt  DateTime  @updatedAt
+  updEndDt  DateTime?
+  updatedBy String
+
+  variableName String @unique
+
+  measurementPoints MeasurementPoint[]
+
+  @@map("measurement_variables")
+}
+
+model MpDataType {
+  id        Int       @id @default(autoincrement())
+  insertDt  DateTime  @default(now())
+  createdBy String
+  updateDt  DateTime  @updatedAt
+  updEndDt  DateTime?
+  updatedBy String
+
+  dataTypeName String @unique
+
+  measurementPoints MeasurementPoint[]
+
+  @@map("mp_data_types")
+}
+
+model MeasurementUnit {
+  id        Int       @id @default(autoincrement())
+  insertDt  DateTime  @default(now())
+  createdBy String
+  updateDt  DateTime  @updatedAt
+  updEndDt  DateTime?
+  updatedBy String
+
+  unitTitle      String @unique
+  targetUnitId   Int?
+  conversionCoef Float?
+
+  targetUnit  MeasurementUnit?  @relation("MeasurementUnitToTarget", fields: [targetUnitId], references: [id])
+  sourceUnits MeasurementUnit[] @relation("MeasurementUnitToTarget")
+
+  measurementPoints MeasurementPoint[]
+
+  @@map("measurement_units")
 }
 
 model MeasurementReading {
@@ -318,6 +473,7 @@ model MeasurementReading {
   @@index([tenantId])
   @@index([pointId])
   @@index([ts])
+  @@map("measurement_readings")
 }
 
 model Account {
@@ -358,31 +514,33 @@ model VerificationToken {
 }
 
 model Industry {
-  id               String           @id @default(cuid())
-  code             String           @unique
-  name             String
-  isActive         Boolean          @default(true)
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
-  sortOrder        Int              @default(100)
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  sortOrder Int      @default(100)
+
   modules          Module[]
   tenantIndustries TenantIndustry[]
 }
 
 model Module {
-  id            String         @id @default(cuid())
-  code          String
-  name          String
-  description   String?
-  routePath     String?
-  isAddon       Boolean        @default(true)
-  isActive      Boolean        @default(true)
-  sortOrder     Int            @default(100)
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  industryId    String
+  id          String   @id @default(cuid())
+  code        String
+  name        String
+  description String?
+  routePath   String?
+  isAddon     Boolean  @default(true)
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(100)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  industryId  String
+
   industry      Industry       @relation(fields: [industryId], references: [id], onDelete: Cascade)
-  ReportGroup   ReportGroup[]
+  reportGroups  ReportGroup[]
   tenantModules TenantModule[]
 
   @@unique([industryId, code])
@@ -431,19 +589,21 @@ model AssetAttribute {
   value     String
   createdAt DateTime @default(now())
   updatedAt DateTime
-  Asset     Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  asset Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
 
   @@unique([assetId, key])
   @@index([assetId])
 }
 
 model AssetParameter {
-  id          String    @id
+  id          String  @id
   assetId     String
   parameterId String
-  required    Boolean   @default(true)
-  Asset       Asset     @relation(fields: [assetId], references: [id], onDelete: Cascade)
-  Parameter   Parameter @relation(fields: [parameterId], references: [id], onDelete: Cascade)
+  required    Boolean @default(true)
+
+  asset     Asset     @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  parameter Parameter @relation(fields: [parameterId], references: [id], onDelete: Cascade)
 
   @@unique([assetId, parameterId])
   @@index([assetId])
@@ -461,7 +621,7 @@ model AssetType {
   updatedAt DateTime          @updatedAt
 
   tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  Asset  Asset[]
+  assets Asset[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -478,8 +638,9 @@ model CalculatedResult {
   unit        String
   trace       Json?
   createdAt   DateTime   @default(now())
-  Parameter   Parameter  @relation(fields: [parameterId], references: [id], onDelete: Cascade)
-  Tenant      Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  parameter Parameter @relation(fields: [parameterId], references: [id], onDelete: Cascade)
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@unique([tenantId, day, scopeLevel, scopeId, parameterId])
   @@index([day])
@@ -497,9 +658,10 @@ model Facility {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  Tenant Tenant  @relation(fields: [tenantId], references: [id])
-  Site   Site    @relation(fields: [siteId], references: [id])
-  Asset  Asset[]
+  tenant            Tenant             @relation(fields: [tenantId], references: [id])
+  site              Site               @relation(fields: [siteId], references: [id])
+  assets            Asset[]
+  measurementPoints MeasurementPoint[]
 
   @@unique([tenantId, code])
   @@unique([siteId, code])
@@ -519,25 +681,26 @@ model Site {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  Tenant   Tenant     @relation(fields: [tenantId], references: [id])
-  Facility Facility[]
+  tenant     Tenant     @relation(fields: [tenantId], references: [id])
+  facilities Facility[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
 }
 
 model Formula {
-  id                String           @id
+  id                String          @id
   reportId          String
   methodologyId     String
   outputParameterId String
   expressionText    String
   astJson           Json
-  scopeLevel        ScopeLevel       @default(EMITTER)
-  aggregationRule   AggregationRule  @default(SUM)
-  Methodology       Methodology      @relation(fields: [methodologyId], references: [id], onDelete: Cascade)
-  Parameter         Parameter        @relation(fields: [outputParameterId], references: [id])
-  ReportDefinition  ReportDefinition @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  scopeLevel        ScopeLevel      @default(EMITTER)
+  aggregationRule   AggregationRule @default(SUM)
+
+  methodology      Methodology      @relation(fields: [methodologyId], references: [id], onDelete: Cascade)
+  parameter        Parameter        @relation(fields: [outputParameterId], references: [id])
+  reportDefinition ReportDefinition @relation(fields: [reportId], references: [id], onDelete: Cascade)
 
   @@index([methodologyId])
   @@index([outputParameterId])
@@ -545,25 +708,27 @@ model Formula {
 }
 
 model MethodProfile {
-  id                  String              @id
+  id                  String  @id
   reportMethodologyId String
   name                String?
-  isActive            Boolean             @default(true)
-  ReportMethodology   ReportMethodology   @relation(fields: [reportMethodologyId], references: [id], onDelete: Cascade)
-  MethodProfileItem   MethodProfileItem[]
+  isActive            Boolean @default(true)
+
+  reportMethodology ReportMethodology   @relation(fields: [reportMethodologyId], references: [id], onDelete: Cascade)
+  items             MethodProfileItem[]
 
   @@index([reportMethodologyId])
 }
 
 model MethodProfileItem {
-  id              String        @id
+  id              String     @id
   methodProfileId String
   parameterId     String
-  required        Boolean       @default(true)
-  sortOrder       Int           @default(100)
-  scopeLevel      ScopeLevel    @default(EMITTER)
-  MethodProfile   MethodProfile @relation(fields: [methodProfileId], references: [id], onDelete: Cascade)
-  Parameter       Parameter     @relation(fields: [parameterId], references: [id], onDelete: Cascade)
+  required        Boolean    @default(true)
+  sortOrder       Int        @default(100)
+  scopeLevel      ScopeLevel @default(EMITTER)
+
+  methodProfile MethodProfile @relation(fields: [methodProfileId], references: [id], onDelete: Cascade)
+  parameter     Parameter     @relation(fields: [parameterId], references: [id], onDelete: Cascade)
 
   @@unique([methodProfileId, parameterId])
   @@index([methodProfileId])
@@ -571,13 +736,14 @@ model MethodProfileItem {
 }
 
 model Methodology {
-  id                  String                @id
-  code                String                @unique
-  name                String
-  isActive            Boolean               @default(true)
-  Formula             Formula[]
-  ReportMethodology   ReportMethodology[]
-  TenantReportDefault TenantReportDefault[]
+  id       String  @id
+  code     String  @unique
+  name     String
+  isActive Boolean @default(true)
+
+  formulas             Formula[]
+  reportMethodologies  ReportMethodology[]
+  tenantReportDefaults TenantReportDefault[]
 }
 
 model Observation {
@@ -631,38 +797,41 @@ model Parameter {
 }
 
 model ParameterGroup {
-  id        String      @id
-  code      String      @unique
+  id        String  @id
+  code      String  @unique
   name      String
-  sortOrder Int         @default(100)
-  isActive  Boolean     @default(true)
-  Parameter Parameter[]
+  sortOrder Int     @default(100)
+  isActive  Boolean @default(true)
+
+  parameters Parameter[]
 }
 
 model ParameterUnit {
-  id          String    @id
+  id          String @id
   parameterId String
   unit        String
-  Parameter   Parameter @relation(fields: [parameterId], references: [id], onDelete: Cascade)
+
+  parameter Parameter @relation(fields: [parameterId], references: [id], onDelete: Cascade)
 
   @@unique([parameterId, unit])
   @@index([parameterId])
 }
 
 model ReportDayStatus {
-  id               String            @id
-  tenantId         String
-  reportId         String
-  day              DateTime          @db.Date
-  status           DayWorkflowStatus @default(DRAFT)
-  submittedAt      DateTime?
-  submittedBy      String?
-  approvedAt       DateTime?
-  approvedBy       String?
-  lockedAt         DateTime?
-  lockedBy         String?
-  ReportDefinition ReportDefinition  @relation(fields: [reportId], references: [id], onDelete: Cascade)
-  Tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  id          String            @id
+  tenantId    String
+  reportId    String
+  day         DateTime          @db.Date
+  status      DayWorkflowStatus @default(DRAFT)
+  submittedAt DateTime?
+  submittedBy String?
+  approvedAt  DateTime?
+  approvedBy  String?
+  lockedAt    DateTime?
+  lockedBy    String?
+
+  reportDefinition ReportDefinition @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  tenant           Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@unique([tenantId, reportId, day])
   @@index([day])
@@ -671,20 +840,21 @@ model ReportDayStatus {
 }
 
 model ReportDefinition {
-  id                        String                           @id
-  reportGroupId             String
-  code                      String
-  name                      String
-  description               String?
-  sortOrder                 Int                              @default(100)
-  isActive                  Boolean                          @default(true)
-  Formula                   Formula[]
-  ReportDayStatus           ReportDayStatus[]
-  ReportGroup               ReportGroup                      @relation(fields: [reportGroupId], references: [id], onDelete: Cascade)
-  ReportMethodology         ReportMethodology[]
-  ReportRun                 ReportRun[]
-  TenantReportDefault       TenantReportDefault[]
-  ReportAssignment          ReportAssignment[]
+  id            String  @id
+  reportGroupId String
+  code          String
+  name          String
+  description   String?
+  sortOrder     Int     @default(100)
+  isActive      Boolean @default(true)
+
+  formulas                  Formula[]
+  reportDayStatuses         ReportDayStatus[]
+  reportGroup               ReportGroup                      @relation(fields: [reportGroupId], references: [id], onDelete: Cascade)
+  reportMethodologies       ReportMethodology[]
+  reportRuns                ReportRun[]
+  tenantReportDefaults      TenantReportDefault[]
+  reportAssignments         ReportAssignment[]
   reportFunctionAssignments TenantReportFunctionAssignment[]
 
   @@unique([reportGroupId, code])
@@ -692,26 +862,28 @@ model ReportDefinition {
 }
 
 model ReportGroup {
-  id               String             @id
-  moduleId         String
-  code             String
-  name             String
-  sortOrder        Int                @default(100)
-  isActive         Boolean            @default(true)
-  ReportDefinition ReportDefinition[]
-  Module           Module             @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  id        String  @id
+  moduleId  String
+  code      String
+  name      String
+  sortOrder Int     @default(100)
+  isActive  Boolean @default(true)
+
+  reportDefinitions ReportDefinition[]
+  module            Module             @relation(fields: [moduleId], references: [id], onDelete: Cascade)
 
   @@unique([moduleId, code])
   @@index([moduleId])
 }
 
 model ReportMethodology {
-  id               String           @id
-  reportId         String
-  methodologyId    String
-  MethodProfile    MethodProfile[]
-  Methodology      Methodology      @relation(fields: [methodologyId], references: [id], onDelete: Cascade)
-  ReportDefinition ReportDefinition @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  id            String @id
+  reportId      String
+  methodologyId String
+
+  methodProfiles   MethodProfile[]
+  methodology      Methodology      @relation(fields: [methodologyId], references: [id], onDelete: Cascade)
+  reportDefinition ReportDefinition @relation(fields: [reportId], references: [id], onDelete: Cascade)
 
   @@unique([reportId, methodologyId])
   @@index([methodologyId])
@@ -719,18 +891,19 @@ model ReportMethodology {
 }
 
 model ReportRun {
-  id                String           @id
+  id                String   @id
   tenantId          String
   reportId          String
-  fromDate          DateTime         @db.Date
-  toDate            DateTime         @db.Date
+  fromDate          DateTime @db.Date
+  toDate            DateTime @db.Date
   methodologyId     String?
   createdBy         String?
-  createdAt         DateTime         @default(now())
+  createdAt         DateTime @default(now())
   dashboardSnapshot Json?
   documentHtml      String?
-  ReportDefinition  ReportDefinition @relation(fields: [reportId], references: [id], onDelete: Cascade)
-  Tenant            Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  reportDefinition ReportDefinition @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  tenant           Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([fromDate])
   @@index([reportId])
@@ -739,13 +912,14 @@ model ReportRun {
 }
 
 model TenantReportDefault {
-  id               String           @id
-  tenantId         String
-  reportId         String
-  methodologyId    String
-  Methodology      Methodology      @relation(fields: [methodologyId], references: [id], onDelete: Cascade)
-  ReportDefinition ReportDefinition @relation(fields: [reportId], references: [id], onDelete: Cascade)
-  Tenant           Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  id            String @id
+  tenantId      String
+  reportId      String
+  methodologyId String
+
+  methodology      Methodology      @relation(fields: [methodologyId], references: [id], onDelete: Cascade)
+  reportDefinition ReportDefinition @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  tenant           Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@unique([tenantId, reportId])
   @@index([reportId])
