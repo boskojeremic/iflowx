@@ -25,17 +25,27 @@ export async function POST(req: Request) {
 
   const body = await req.json();
 
-  const item = await db.reportDefinition.create({
-    data: {
-      id: crypto.randomUUID(),
-      reportGroupId: body.reportGroupId,
-      code: body.code,
-      name: body.name,
-      description: body.description ?? null,
-      sortOrder: Number(body.sortOrder) || 100,
-      isActive: true,
-    },
-  });
+  const reportGroup = await db.reportGroup.findUnique({
+  where: { id: body.reportGroupId },
+  select: { id: true, tenantId: true },
+});
+
+if (!reportGroup) {
+  return Response.json({ error: "Invalid reportGroupId" }, { status: 400 });
+}
+
+const item = await db.reportDefinition.create({
+  data: {
+    id: crypto.randomUUID(),
+    tenantId: reportGroup.tenantId,
+    reportGroupId: reportGroup.id,
+    code: body.code,
+    name: body.name,
+    description: body.description ?? null,
+    sortOrder: Number(body.sortOrder ?? 0),
+    isActive: true,
+  },
+});
 
   return NextResponse.json(item);
 }

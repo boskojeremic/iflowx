@@ -1,4 +1,3 @@
-// app/(core)/layout.tsx
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/authz";
 import { checkUserLicense } from "@/lib/license";
@@ -54,8 +53,8 @@ export default async function CoreAppLayout({
   const lic = await checkUserLicense(user.email);
 
   const { nav } = tenantId
-  ? await getPortalNavForUserTenant(user.id, tenantId)
-  : { nav: [] };
+    ? await getPortalNavForUserTenant(user.id, tenantId)
+    : { nav: [] };
 
   const groups = nav
     .map((g: any) => ({
@@ -87,7 +86,7 @@ export default async function CoreAppLayout({
         showMasterDataAdmin={showMasterDataAdmin}
       />
 
-      <main className="flex min-h-screen md:h-screen flex-1 min-w-0 flex-col overflow-y-auto md:overflow-hidden bg-[#07110d]">
+      <div className="flex min-h-screen md:h-screen flex-1 min-w-0 flex-col overflow-y-auto md:overflow-hidden bg-[#07110d]">
         <div className="shrink-0 md:hidden">
           <MobileNavClient
             groups={groups}
@@ -138,12 +137,12 @@ export default async function CoreAppLayout({
           </div>
         </div>
 
-        <div className="flex-1 overflow-visible md:overflow-hidden bg-[#07110d] p-3 sm:p-4 md:p-6">
+        <main className="flex-1 overflow-visible md:overflow-hidden bg-[#07110d] p-3 sm:p-4 md:p-6">
           <div className="mx-auto flex w-full max-w-[1600px] flex-col md:h-full px-0 sm:px-2 md:px-4 lg:px-8">
             {children}
           </div>
-        </div>
-      </main>
+        </main>
+      </div>
     </div>
   );
 }

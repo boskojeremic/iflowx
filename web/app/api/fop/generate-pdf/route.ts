@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
       process.env.NEXT_PUBLIC_APP_URL ||
       "http://localhost:3001";
 
-    const previewUrl = `${baseUrl}/fop-preview/${reportCode}?date=${reportDate}`;
+    const previewUrl = `${baseUrl}/pdf/fop-preview/${reportCode}?date=${reportDate}`;
 
     await fs.mkdir(FOP_PDF_DIR, { recursive: true });
 

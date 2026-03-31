@@ -27,7 +27,7 @@ export async function GET() {
     where: { isActive: true },
     orderBy: { code: "asc" },
     include: {
-      modules: {
+    Module: {
         where: { isActive: true },
         orderBy: [{ sortOrder: "asc" }, { code: "asc" }],
         select: {

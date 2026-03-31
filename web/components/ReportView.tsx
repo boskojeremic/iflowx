@@ -4,10 +4,18 @@ type Props = {
   pdfSrc: string;
   title?: string;
   reportDate?: string;
+  status?: string;
 };
 
-function withPdfParams(src: string) {
+function withViewerParams(src: string) {
   if (!src) return src;
+
+  const isPdf =
+    src.includes("/api/fop/pdf/") || src.toLowerCase().includes(".pdf");
+
+  if (!isPdf) {
+    return src;
+  }
 
   const hasHash = src.includes("#");
   const joiner = hasHash ? "&" : "#";
@@ -20,7 +28,7 @@ export default function ReportView({
   title,
   reportDate,
 }: Props) {
-  const viewerSrc = withPdfParams(pdfSrc);
+  const viewerSrc = withViewerParams(pdfSrc);
 
   return (
     <div className="w-full">
@@ -40,7 +48,7 @@ export default function ReportView({
         <iframe
           key={viewerSrc}
           src={viewerSrc}
-          title={title ?? "PDF Preview"}
+          title={title ?? "Report Preview"}
           className="block h-[900px] w-full bg-white"
         />
       </div>

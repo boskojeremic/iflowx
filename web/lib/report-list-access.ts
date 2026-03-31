@@ -58,7 +58,7 @@ export async function getAccessibleReportsForUser(args: {
             select: {
               id: true,
               name: true,
-              industry: {
+              Industry: {
                 select: {
                   name: true,
                 },
@@ -80,7 +80,7 @@ export async function getAccessibleReportsForUser(args: {
       },
     },
     orderBy: [
-      { ReportGroup: { Module: { industry: { sortOrder: "asc" } } } },
+      { ReportGroup: { Module: { Industry: { sortOrder: "asc" } } } },
       { ReportGroup: { Module: { name: "asc" } } },
       { ReportGroup: { name: "asc" } },
       { sortOrder: "asc" },
@@ -110,7 +110,7 @@ export async function getAccessibleReportsForUser(args: {
       reportGroupName: r.ReportGroup.name,
       moduleId: r.ReportGroup.Module.id,
       moduleName: r.ReportGroup.Module.name,
-      industryName: r.ReportGroup.Module.industry?.name ?? null,
+      industryName: r.ReportGroup.Module.Industry?.name ?? null,
       responsibleFunctionId: assignment?.responsibleFunctionId ?? null,
       approverFunctionId: assignment?.approverFunctionId ?? null,
       mode: permissions.mode,

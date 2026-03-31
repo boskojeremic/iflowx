@@ -42,6 +42,7 @@ export default function ReportAndDateFilters({
     params.set("rightTab", rightTab);
     params.set("report", nextReportCode);
     params.set("date", nextDate);
+    params.delete("rev");
 
     router.replace(`/ogi/fop?${params.toString()}`);
     router.refresh();
@@ -54,7 +55,7 @@ export default function ReportAndDateFilters({
         <select
           value={selectedReportCode}
           onChange={(e) => applyChange({ report: e.target.value })}
-          className="mt-2 w-full rounded-md border border-white/10 bg-black/30 px-3 py-2 text-sm"
+          className="mt-2 h-11 w-full rounded-md border border-white/10 bg-black/30 px-3 text-sm outline-none transition hover:bg-black/40"
         >
           {reports.map((r) => (
             <option key={r.id} value={r.code}>
@@ -71,7 +72,7 @@ export default function ReportAndDateFilters({
           value={selectedDate}
           max={maxDate}
           onChange={(e) => applyChange({ date: e.target.value })}
-          className="mt-2 w-full rounded-md border border-white/10 bg-black/30 px-3 py-2 text-sm"
+          className="mt-2 h-11 w-full rounded-md border border-white/10 bg-black/30 px-3 text-sm outline-none transition hover:bg-black/40"
         />
       </div>
     </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import DeleteConfirm from "@/components/DeleteConfirm";
 import {
@@ -70,42 +70,35 @@ export default function ReportsPanel() {
 
   const isEditMode = !!editingId;
 
-  const filteredModules = useMemo(() => {
-    return modules.filter((m) => m.industryId === industryId);
-  }, [modules, industryId]);
-
-  const filteredGroups = useMemo(() => {
-    return groups.filter((g) => g.moduleId === moduleId);
-  }, [groups, moduleId]);
-
   async function loadIndustries() {
-    const res = await fetch("/api/core-admin/industries", { cache: "no-store" });
+    const res = await fetch("/api/master-data/industries", {
+      cache: "no-store",
+    });
     const data = await res.json().catch(() => null);
 
     const list: Industry[] = Array.isArray(data)
       ? data
       : Array.isArray(data?.industries)
-      ? data.industries
-      : [];
+        ? data.industries
+        : [];
 
     setIndustries(list);
 
-    if (!industryId && list.length > 0) {
-      setIndustryId(list[0].id);
-    }
+    setIndustryId((prev) => {
+      if (prev && list.some((i) => i.id === prev)) return prev;
+      return list[0]?.id || "";
+    });
   }
 
-  async function loadModules(selectedIndustryId?: string) {
-    const targetIndustryId = selectedIndustryId || industryId;
-
-    if (!targetIndustryId) {
+  async function loadModules(selectedIndustryId: string) {
+    if (!selectedIndustryId) {
       setModules([]);
       setModuleId("");
       return;
     }
 
     const res = await fetch(
-      `/api/core-admin/modules?industryId=${encodeURIComponent(targetIndustryId)}`,
+      `/api/master-data/modules?industryId=${encodeURIComponent(selectedIndustryId)}`,
       { cache: "no-store" }
     );
     const data = await res.json().catch(() => null);
@@ -113,8 +106,8 @@ export default function ReportsPanel() {
     const list: ModuleRow[] = Array.isArray(data)
       ? data
       : Array.isArray(data?.modules)
-      ? data.modules
-      : [];
+        ? data.modules
+        : [];
 
     setModules(list);
 
@@ -124,17 +117,15 @@ export default function ReportsPanel() {
     });
   }
 
-  async function loadReportGroups(selectedModuleId?: string) {
-    const targetModuleId = selectedModuleId || moduleId;
-
-    if (!targetModuleId) {
+  async function loadReportGroups(selectedModuleId: string) {
+    if (!selectedModuleId) {
       setGroups([]);
       setGroupId("");
       return;
     }
 
     const res = await fetch(
-      `/api/core-admin/report-groups?moduleId=${encodeURIComponent(targetModuleId)}`,
+      `/api/master-data/report-groups?moduleId=${encodeURIComponent(selectedModuleId)}`,
       { cache: "no-store" }
     );
     const data = await res.json().catch(() => null);
@@ -142,8 +133,8 @@ export default function ReportsPanel() {
     const list: ReportGroupRow[] = Array.isArray(data)
       ? data
       : Array.isArray(data?.reportGroups)
-      ? data.reportGroups
-      : [];
+        ? data.reportGroups
+        : [];
 
     setGroups(list);
 
@@ -153,16 +144,14 @@ export default function ReportsPanel() {
     });
   }
 
-  async function loadReports(selectedGroupId?: string) {
-    const targetGroupId = selectedGroupId || groupId;
-
-    if (!targetGroupId) {
+  async function loadReports(selectedGroupId: string) {
+    if (!selectedGroupId) {
       setRows([]);
       return;
     }
 
     const res = await fetch(
-      `/api/core-admin/reports?reportGroupId=${encodeURIComponent(targetGroupId)}`,
+      `/api/master-data/reports?reportGroupId=${encodeURIComponent(selectedGroupId)}`,
       { cache: "no-store" }
     );
     const data = await res.json().catch(() => null);
@@ -170,8 +159,8 @@ export default function ReportsPanel() {
     const list: ReportRow[] = Array.isArray(data)
       ? data
       : Array.isArray(data?.reports)
-      ? data.reports
-      : [];
+        ? data.reports
+        : [];
 
     setRows(list);
   }
@@ -181,7 +170,14 @@ export default function ReportsPanel() {
   }, []);
 
   useEffect(() => {
-    if (!industryId) return;
+    if (!industryId) {
+      setModules([]);
+      setModuleId("");
+      setGroups([]);
+      setGroupId("");
+      setRows([]);
+      return;
+    }
 
     setEditingId(null);
     setCode("");
@@ -244,11 +240,13 @@ export default function ReportsPanel() {
     if (!industryId) return toast.error("Please select Industry.");
     if (!moduleId) return toast.error("Please select Module.");
     if (!groupId) return toast.error("Please select Report Group.");
-    if (!code.trim() || !name.trim()) return toast.error("Code and Name are required.");
+    if (!code.trim() || !name.trim()) {
+      return toast.error("Code and Name are required.");
+    }
 
     setBusy(true);
     try {
-      const res = await fetch("/api/core-admin/reports", {
+      const res = await fetch("/api/master-data/reports", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -276,11 +274,13 @@ export default function ReportsPanel() {
 
   async function handleUpdate() {
     if (!editingId) return toast.error("No row selected.");
-    if (!code.trim() || !name.trim()) return toast.error("Code and Name are required.");
+    if (!code.trim() || !name.trim()) {
+      return toast.error("Code and Name are required.");
+    }
 
     setBusy(true);
     try {
-      const res = await fetch(`/api/core-admin/reports/${editingId}`, {
+      const res = await fetch(`/api/master-data/reports/${editingId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -308,7 +308,7 @@ export default function ReportsPanel() {
   async function handleDelete(id: string) {
     setBusy(true);
     try {
-      const res = await fetch(`/api/core-admin/reports/${id}`, {
+      const res = await fetch(`/api/master-data/reports/${id}`, {
         method: "DELETE",
       });
 
@@ -348,7 +348,7 @@ export default function ReportsPanel() {
           onChange={(e) => setModuleId(e.target.value)}
           disabled={busy || !industryId}
         >
-          {filteredModules.map((m) => (
+          {modules.map((m) => (
             <option key={m.id} value={m.id}>
               {m.name} ({m.code})
             </option>
@@ -361,7 +361,7 @@ export default function ReportsPanel() {
           onChange={(e) => setGroupId(e.target.value)}
           disabled={busy || !moduleId}
         >
-          {filteredGroups.map((g) => (
+          {groups.map((g) => (
             <option key={g.id} value={g.id}>
               {g.name} ({g.code})
             </option>
@@ -372,7 +372,7 @@ export default function ReportsPanel() {
           className="col-span-6 md:col-span-2 min-w-0 px-3 py-2 bg-black/40 border border-white/20 rounded-md"
           placeholder="CODE"
           value={code}
-          onChange={(e) => setCode(e.target.value)}
+          onChange={(e) => setCode(upper(e.target.value))}
           disabled={busy}
         />
 
@@ -388,7 +388,7 @@ export default function ReportsPanel() {
           className="col-span-12 md:col-span-6 min-w-0 px-3 py-2 bg-black/40 border border-white/20 rounded-md"
           placeholder="NAME"
           value={name}
-          onChange={(e) => setName(e.target.value)}
+          onChange={(e) => setName(upper(e.target.value))}
           disabled={busy}
         />
 
@@ -412,7 +412,7 @@ export default function ReportsPanel() {
           className="col-span-12 min-w-0 px-3 py-2 bg-black/40 border border-white/20 rounded-md"
           placeholder="DESCRIPTION"
           value={description}
-          onChange={(e) => setDescription(e.target.value)}
+          onChange={(e) => setDescription(upper(e.target.value))}
           disabled={busy}
         />
       </div>

@@ -71,7 +71,7 @@ export async function getPortalNavForUserTenant(
           name: true,
           routePath: true,
           sortOrder: true,
-          industry: {
+          Industry: {
             select: {
               id: true,
               code: true,
@@ -89,7 +89,7 @@ export async function getPortalNavForUserTenant(
 
   for (const row of tms) {
     const m = row.module;
-    const ind = m.industry;
+    const ind = m.Industry;
 
     if (!ind?.isActive) continue;
     if (!m.routePath || String(m.routePath).trim() === "") continue;

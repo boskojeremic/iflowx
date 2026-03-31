@@ -2,9 +2,13 @@
 
 import { useState } from "react";
 import { signIn } from "next-auth/react";
+import { useSearchParams } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
 
 export default function LoginClient() {
+  const searchParams = useSearchParams();
+  const callbackUrl = searchParams.get("callbackUrl") || "/";
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -16,10 +20,13 @@ export default function LoginClient() {
     setError("");
     setLoading(true);
 
+    const normalizedEmail = email.trim().toLowerCase();
+
     const res = await signIn("credentials", {
-      email: email.trim().toLowerCase(),
+      email: normalizedEmail,
       password,
       redirect: false,
+      callbackUrl,
     });
 
     if (!res || res.error) {
@@ -28,17 +35,17 @@ export default function LoginClient() {
       return;
     }
 
-    // SUPER ADMIN → /admin
-    // Običan user → /
+    if (callbackUrl && callbackUrl !== "/") {
+      setLoading(false);
+      window.location.assign(callbackUrl);
+      return;
+    }
+
     try {
       const r = await fetch("/api/admin/tenants", { cache: "no-store" });
       if (r.ok) {
         const d = await r.json();
         if (d?.ok && Array.isArray(d?.tenants)) {
-          // Super admin dobija "sve" (ok je i za običnog, ali mi ćemo kasnije napraviti čist /api/me)
-          // Za sada: super admin redirect na /admin, ostali na /
-          // Najsigurnije: ako user nema membership, tenants može biti [], pa NE zaključujemo super admin po tome.
-          // Zato ovde samo probamo: ako endpoint vrati ok, ide na /admin.
           setLoading(false);
           window.location.assign("/core-admin");
           return;
@@ -88,6 +95,13 @@ export default function LoginClient() {
             {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
           </button>
         </div>
+
+        {callbackUrl && callbackUrl !== "/" ? (
+          <div className="text-center text-xs text-white/50 break-all">
+            After login you will be returned to:
+            <div className="mt-1 text-white/70">{callbackUrl}</div>
+          </div>
+        ) : null}
 
         {error && <div className="text-red-400 text-sm text-center">{error}</div>}
 

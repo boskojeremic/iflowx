@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
 
 export async function middleware(req: any) {
-  const { pathname } = req.nextUrl;
+  const { pathname, search } = req.nextUrl;
 
   // javne / tehničke rute koje ne smeju da idu na login
   if (
@@ -24,9 +24,14 @@ export async function middleware(req: any) {
   });
 
   if (!token?.email) {
-    const url = req.nextUrl.clone();
-    url.pathname = "/login";
-    return NextResponse.redirect(url);
+    const loginUrl = req.nextUrl.clone();
+    loginUrl.pathname = "/login";
+    loginUrl.search = "";
+
+    const callbackUrl = `${pathname}${search || ""}`;
+    loginUrl.searchParams.set("callbackUrl", callbackUrl);
+
+    return NextResponse.redirect(loginUrl);
   }
 
   return NextResponse.next();

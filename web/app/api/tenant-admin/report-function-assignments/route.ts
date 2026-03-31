@@ -44,7 +44,9 @@ async function getModuleSeatSummary(tenantId: string, moduleId: string) {
   const moduleReportIds = (
     await db.reportDefinition.findMany({
       where: {
+        tenantId,
         ReportGroup: {
+          tenantId,
           moduleId,
         },
         isActive: true,
@@ -136,7 +138,7 @@ export async function GET(req: Request) {
             id: true,
             code: true,
             name: true,
-            industry: {
+            Industry: {
               select: {
                 id: true,
                 name: true,
@@ -152,21 +154,23 @@ export async function GET(req: Request) {
         id: x.module.id,
         code: x.module.code,
         name: x.module.name,
-        industryId: x.module.industry?.id ?? "",
-        industryName: x.module.industry?.name ?? "Other",
+        industryId: x.module.Industry?.id ?? "",
+        industryName: x.module.Industry?.name ?? "Other",
       }))
-      .sort((a, b) =>
-        a.industryName.localeCompare(b.industryName, undefined, {
-          sensitivity: "base",
-        }) ||
-        a.name.localeCompare(b.name, undefined, {
-          sensitivity: "base",
-        })
+      .sort(
+        (a, b) =>
+          a.industryName.localeCompare(b.industryName, undefined, {
+            sensitivity: "base",
+          }) ||
+          a.name.localeCompare(b.name, undefined, {
+            sensitivity: "base",
+          })
       );
 
     const reportGroups = moduleId
       ? await db.reportGroup.findMany({
           where: {
+            tenantId,
             moduleId,
             isActive: true,
           },
@@ -183,6 +187,7 @@ export async function GET(req: Request) {
     const reportsRaw = reportGroupId
       ? await db.reportDefinition.findMany({
           where: {
+            tenantId,
             reportGroupId,
             isActive: true,
           },
@@ -263,11 +268,14 @@ export async function GET(req: Request) {
       reports,
       operationalFunctions,
       selectedModuleId: moduleId || null,
-      selectedReportGroupId: reportGroupId || null,
+      selectedreportGroupId: reportGroupId || null,
       licenseSummary,
     });
   } catch (error) {
-    console.error("GET /api/tenant-admin/report-function-assignments failed:", error);
+    console.error(
+      "GET /api/tenant-admin/report-function-assignments failed:",
+      error
+    );
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -307,14 +315,19 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "REPORT_REQUIRED" }, { status: 400 });
     }
 
-    const report = await db.reportDefinition.findUnique({
-      where: { id: reportId },
+    const report = await db.reportDefinition.findFirst({
+      where: {
+        id: reportId,
+        tenantId,
+        isActive: true,
+      },
       select: {
         id: true,
         reportGroupId: true,
         ReportGroup: {
           select: {
             moduleId: true,
+            tenantId: true,
           },
         },
       },
@@ -381,7 +394,9 @@ export async function POST(req: Request) {
     const moduleReportIds = (
       await db.reportDefinition.findMany({
         where: {
+          tenantId,
           ReportGroup: {
+            tenantId,
             moduleId: report.ReportGroup.moduleId,
           },
           isActive: true,
@@ -392,20 +407,22 @@ export async function POST(req: Request) {
       })
     ).map((r) => r.id);
 
-    const existingAssignments = await db.tenantReportFunctionAssignment.findMany({
-      where: {
-        tenantId,
-        reportId: {
-          in: moduleReportIds,
+    const existingAssignments = await db.tenantReportFunctionAssignment.findMany(
+      {
+        where: {
+          tenantId,
+          reportId: {
+            in: moduleReportIds,
+          },
+          isActive: true,
         },
-        isActive: true,
-      },
-      select: {
-        reportId: true,
-        responsibleFunctionId: true,
-        approverFunctionId: true,
-      },
-    });
+        select: {
+          reportId: true,
+          responsibleFunctionId: true,
+          approverFunctionId: true,
+        },
+      }
+    );
 
     const simulatedAssignments = existingAssignments.filter(
       (a) => a.reportId !== reportId
@@ -487,7 +504,10 @@ export async function POST(req: Request) {
       licenseSummary,
     });
   } catch (error) {
-    console.error("POST /api/tenant-admin/report-function-assignments failed:", error);
+    console.error(
+      "POST /api/tenant-admin/report-function-assignments failed:",
+      error
+    );
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
