@@ -42,8 +42,11 @@ model Tenant {
   measurementSnapshots      MeasurementSnapshot[]
   scadaMeasurements         ScadaMeasurement[]
 
-  reportGroups      ReportGroup[]
-  reportDefinitions ReportDefinition[]
+  reportGroups            ReportGroup[]
+  reportDefinitions       ReportDefinition[]
+  employees               Employee[]
+  employeeTrainingRecords EmployeeTrainingRecord[]
+  employeeHseRecords      EmployeeHseRecord[]
 }
 
 model User {
@@ -542,7 +545,8 @@ model MeasurementSnapshot {
   contributorUser User? @relation("MeasurementSnapshotContributorUser", fields: [contributorUserId], references: [id])
   informerUser    User? @relation("MeasurementSnapshotInformerUser", fields: [informerUserId], references: [id])
 
-  details MeasurementSnapshotDetail[]
+  details     MeasurementSnapshotDetail[]
+  fieldValues ReportSnapshotFieldValue[]
 
   @@unique([reportId, snapshotDate, snapshotRevisionNo])
   @@index([tenantId])
@@ -983,6 +987,7 @@ model ReportDefinition {
   reportFunctionAssignments TenantReportFunctionAssignment[]
   measurementSnapshots      MeasurementSnapshot[]
   reportMeasurementPoints   ReportMeasurementPoint[]
+  templateFields            ReportTemplateField[]
 
   @@unique([tenantId, reportGroupId, code])
   @@index([tenantId])
@@ -1130,6 +1135,138 @@ model TenantReportFunctionAssignment {
   @@index([approverFunctionId])
 }
 
+model ReportTemplateField {
+  id          String          @id @default(cuid())
+  reportId    String
+  code        String
+  label       String
+  sectionCode String?
+  fieldType   ReportFieldType
+  unit        String?
+  placeholder String?
+  helpText    String?
+  enumOptions Json?
+  sortOrder   Int             @default(100)
+  isRequired  Boolean         @default(false)
+  isActive    Boolean         @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  report ReportDefinition           @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  values ReportSnapshotFieldValue[]
+
+  @@unique([reportId, code])
+  @@index([reportId])
+  @@index([reportId, sectionCode])
+  @@index([reportId, sortOrder])
+}
+
+model ReportSnapshotFieldValue {
+  id                    String   @id @default(cuid())
+  measurementSnapshotId String
+  snapshotDate          DateTime @db.Date
+  templateFieldId       String
+  fieldCode             String
+
+  valueText    String?
+  valueNumber  Decimal?  @db.Decimal(18, 6)
+  valueBoolean Boolean?
+  valueDate    DateTime?
+  valueJson    Json?
+
+  insertDt  DateTime  @default(now())
+  createdBy String
+  updateDt  DateTime  @updatedAt
+  updEndDt  DateTime?
+  updatedBy String
+
+  measurementSnapshot MeasurementSnapshot @relation(fields: [measurementSnapshotId], references: [id], onDelete: Cascade)
+  templateField       ReportTemplateField @relation(fields: [templateFieldId], references: [id], onDelete: Restrict)
+
+  @@unique([measurementSnapshotId, templateFieldId])
+  @@unique([measurementSnapshotId, fieldCode])
+  @@index([measurementSnapshotId])
+  @@index([snapshotDate])
+  @@index([templateFieldId])
+  @@index([fieldCode])
+}
+
+model Employee {
+  id             String            @id @default(cuid())
+  tenantId       String
+  employeeNo     String?
+  firstName      String
+  lastName       String
+  fullName       String
+  gender         EmployeeGender?
+  birthDate      DateTime?
+  hireDate       DateTime?
+  exitDate       DateTime?
+  employmentType EmployeeType
+  workerCategory EmployeeCategory?
+  department     String?
+  position       String?
+  location       String?
+  nationalId     String?
+  isActive       Boolean           @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant                  Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employeeTrainingRecords EmployeeTrainingRecord[]
+  employeeHseRecords      EmployeeHseRecord[]
+
+  @@unique([tenantId, employeeNo])
+  @@index([tenantId])
+  @@index([tenantId, isActive])
+  @@index([tenantId, employmentType])
+}
+
+model EmployeeTrainingRecord {
+  id               String          @id @default(cuid())
+  tenantId         String
+  employeeId       String
+  trainingName     String
+  trainingCategory String?
+  trainingDate     DateTime?
+  expiryDate       DateTime?
+  hours            Decimal?        @db.Decimal(18, 2)
+  status           TrainingStatus?
+  provider         String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([employeeId])
+}
+
+model EmployeeHseRecord {
+  id           String       @id @default(cuid())
+  tenantId     String
+  employeeId   String
+  eventDate    DateTime
+  eventType    HseEventType
+  severity     String?
+  lostTimeDays Int?
+  description  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([employeeId])
+  @@index([eventDate])
+}
+
 enum ReportUserRole {
   CONTRIBUTOR
   REVIEWER
@@ -1257,4 +1394,55 @@ enum ScopeLevel {
   ASSET
   FACILITY
   TENANT
+}
+
+enum ReportFieldType {
+  TEXT
+  LONG_TEXT
+  NUMBER
+  PERCENT
+  BOOLEAN
+  DATE
+  DATETIME
+  ENUM
+  JSON
+}
+
+enum EmployeeGender {
+  MALE
+  FEMALE
+  OTHER
+  UNDISCLOSED
+}
+
+enum EmployeeType {
+  PERMANENT
+  CONTRACTOR
+  TEMPORARY
+  INTERN
+}
+
+enum EmployeeCategory {
+  STAFF
+  WORKER
+  ENGINEER
+  SUPERVISOR
+  MANAGER
+  EXECUTIVE
+}
+
+enum TrainingStatus {
+  VALID
+  EXPIRED
+  PLANNED
+  COMPLETED
+}
+
+enum HseEventType {
+  INCIDENT
+  NEAR_MISS
+  INJURY
+  LOST_TIME_INJURY
+  MEDICAL_TREATMENT
+  FIRST_AID
 }
