@@ -4,6 +4,7 @@ import { checkUserLicense } from "@/lib/license";
 import { getPortalNavForUserTenant } from "@/lib/portal-nav";
 import AppSidebar from "@/components/AppSidebar";
 import MobileNavClient from "@/components/MobileNavClient";
+import { Toaster } from "sonner";
 
 export default async function CoreAppLayout({
   children,
@@ -143,6 +144,8 @@ export default async function CoreAppLayout({
           </div>
         </main>
       </div>
+
+      <Toaster richColors position="top-right" />
     </div>
   );
 }
