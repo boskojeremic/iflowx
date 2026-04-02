@@ -43,7 +43,6 @@ export default async function FopApprovePage({
   const isPending = approval.status === "PENDING" && !isExpired;
 
   const reportDate = ymd(approval.day);
-
   const pdfSrc = `/fop-preview/${approval.reportCode}?date=${reportDate}&rev=${approval.revisionNo}&token=${approval.token}`;
 
   return (
@@ -52,14 +51,10 @@ export default async function FopApprovePage({
         <div className="w-full max-w-5xl rounded-2xl border border-white/10 bg-white/[0.03] p-5">
           <div className="mb-4 flex items-start justify-between gap-4">
             <div>
-              <div className="text-xl font-semibold">
-                {approval.reportName}
-              </div>
+              <div className="text-xl font-semibold">{approval.reportName}</div>
               <div className="mt-1 text-sm text-white/60">
                 Date: {reportDate} / Revision: {approval.revisionNo}
-                {approval.documentNumber
-                  ? ` / ${approval.documentNumber}`
-                  : ""}
+                {approval.documentNumber ? ` / ${approval.documentNumber}` : ""}
               </div>
             </div>
 
@@ -94,32 +89,8 @@ export default async function FopApprovePage({
             </div>
           )}
 
-          {approval.status === "REJECTED" && approval.rejectComment && (
-            <div className="mt-4 rounded-xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-200">
-              <div className="font-medium">Rejection reason</div>
-              <div className="mt-2 whitespace-pre-wrap">
-                {approval.rejectComment}
-              </div>
-            </div>
-          )}
-
-          {approval.status === "APPROVED" && (
-            <div className="mt-4 rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-4 text-sm text-emerald-200">
-              This report has already been approved.
-            </div>
-          )}
-
-          {isExpired && (
-            <div className="mt-4 rounded-xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-200">
-              This approval link has expired.
-            </div>
-          )}
-
           <div className="mt-5 flex justify-end">
-            <FopApprovalActions
-              token={approval.token}
-              isPending={isPending}
-            />
+            <FopApprovalActions token={approval.token} isPending={isPending} />
           </div>
         </div>
       </div>
