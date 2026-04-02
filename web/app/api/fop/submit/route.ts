@@ -16,7 +16,7 @@ function getAppUrl() {
 
   if (!appUrl) {
     throw new Error(
-      "APP_URL is not configured. Set APP_URL or NEXT_PUBLIC_APP_URL in production."
+      "APP_URL is not configured. Set APP_URL or NEXT_PUBLIC_APP_URL."
     );
   }
 
@@ -90,6 +90,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // SNAPSHOT CHECK
     const snapshot = await db.measurementSnapshot.findUnique({
       where: { id: snapshotId },
       select: {
@@ -100,12 +101,10 @@ export async function POST(req: NextRequest) {
     });
 
     if (!snapshot) {
-      return NextResponse.json(
-        { error: "Snapshot not found. Insert first." },
-        { status: 400 }
-      );
+      throw new Error("Snapshot not found.");
     }
 
+    // APPROVER
     const approver = await db.user.findUnique({
       where: { id: approverUserId },
       select: {
@@ -116,12 +115,10 @@ export async function POST(req: NextRequest) {
     });
 
     if (!approver?.email) {
-      return NextResponse.json(
-        { error: "Approver email not found." },
-        { status: 400 }
-      );
+      throw new Error("Approver email not found.");
     }
 
+    // REQUESTER
     const requester = session?.user?.email
       ? await db.user.findUnique({
           where: { email: session.user.email },
@@ -133,6 +130,7 @@ export async function POST(req: NextRequest) {
         })
       : null;
 
+    // STATUS UPSERT
     await db.reportDayStatus.upsert({
       where: {
         tenantId_reportId_day: {
@@ -156,6 +154,7 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    // TOKEN
     const token = crypto.randomUUID();
 
     await db.reportApprovalToken.create({
@@ -179,36 +178,50 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    // LINK
     const appUrl = getAppUrl();
     const approveLink = `${appUrl}/ogi/fop/approve?token=${token}`;
 
+    // EMAIL
     await sendEmailViaResend({
       to: approver.email,
       subject: `Approval required: ${reportName} / ${date}`,
       html: `
-        <div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.5">
+        <div style="font-family:Arial,sans-serif;font-size:14px">
           <p>Dear ${approver.name || "Approver"},</p>
           <p>A report requires your approval.</p>
+
           <p>
             <strong>Report:</strong> ${reportName}<br/>
             <strong>Date:</strong> ${date}<br/>
             <strong>Revision:</strong> ${snapshot.snapshotRevisionNo ?? revisionNo ?? 0}<br/>
             <strong>Document No:</strong> ${snapshot.documentNumber ?? "-"}
           </p>
+
           <p>
-            <a href="${approveLink}" style="display:inline-block;padding:10px 16px;background:#1d4ed8;color:#fff;text-decoration:none;border-radius:6px">
+            <a href="${approveLink}" style="padding:10px 16px;background:#1d4ed8;color:#fff;text-decoration:none;border-radius:6px">
               Open Approval Page
             </a>
           </p>
+
           <p>Best regards,<br/>iFlowX System</p>
         </div>
       `,
     });
 
+    // REDIRECT
     const safeReturnTo = returnTo.startsWith("/") ? returnTo : "/ogi/fop";
-    return NextResponse.redirect(new URL(safeReturnTo, getAppUrl()));
+    return NextResponse.redirect(new URL(safeReturnTo, appUrl));
+
   } catch (e) {
-    console.error("Submit POST failed:", e);
-    return NextResponse.json({ error: "Submit failed." }, { status: 500 });
+    console.error("SUBMIT FAILED:", e);
+
+    return NextResponse.json(
+      {
+        error: "Submit failed.",
+        details: e instanceof Error ? e.message : String(e),
+      },
+      { status: 500 }
+    );
   }
 }
