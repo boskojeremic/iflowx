@@ -3,8 +3,10 @@ import { db } from "@/lib/db";
 import ReportView from "@/components/ReportView";
 import FopApprovalActions from "@/components/fop/FopApprovalActions";
 
-type SearchParams = {
-  token?: string;
+type Props = {
+  searchParams: Promise<{
+    token?: string;
+  }>;
 };
 
 function ymd(d: Date) {
@@ -14,12 +16,12 @@ function ymd(d: Date) {
   return `${yyyy}-${mm}-${dd}`;
 }
 
-export default async function FopApprovePage({
-  searchParams,
-}: {
-  searchParams: SearchParams;
-}) {
-  const token = String(searchParams?.token ?? "").trim();
+export default async function FopApprovePage({ searchParams }: Props) {
+  const sp = await searchParams;
+
+  console.log("APPROVAL PAGE SEARCH PARAMS:", sp);
+
+  const token = String(sp?.token ?? "").trim();
 
   console.log("APPROVAL PAGE TOKEN:", token);
 
@@ -86,6 +88,27 @@ export default async function FopApprovePage({
                 title={approval.reportName}
                 reportDate={reportDate}
               />
+            </div>
+          )}
+
+          {approval.status === "REJECTED" && approval.rejectComment && (
+            <div className="mt-4 rounded-xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-200">
+              <div className="font-medium">Rejection reason</div>
+              <div className="mt-2 whitespace-pre-wrap">
+                {approval.rejectComment}
+              </div>
+            </div>
+          )}
+
+          {approval.status === "APPROVED" && (
+            <div className="mt-4 rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-4 text-sm text-emerald-200">
+              This report has already been approved.
+            </div>
+          )}
+
+          {isExpired && (
+            <div className="mt-4 rounded-xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-200">
+              This approval link has expired.
             </div>
           )}
 
