@@ -3,9 +3,9 @@ import { db } from "@/lib/db";
 import ReportView from "@/components/ReportView";
 import FopApprovalActions from "@/components/fop/FopApprovalActions";
 
-type SearchParams = Promise<{
+type SearchParams = {
   token?: string;
-}>;
+};
 
 function ymd(d: Date) {
   const yyyy = d.getFullYear();
@@ -19,8 +19,7 @@ export default async function FopApprovePage({
 }: {
   searchParams: SearchParams;
 }) {
-  const sp = await searchParams;
-  const token = String(sp?.token ?? "");
+  const token = String(searchParams?.token ?? "").trim();
 
   if (!token) notFound();
 
@@ -70,18 +69,22 @@ export default async function FopApprovePage({
             </div>
           </div>
 
-          <div className="rounded-xl border border-white/10 bg-black/20 p-3">
-            <ReportView
-              pdfSrc={pdfSrc}
-              title={approval.reportName}
-              reportDate={reportDate}
-            />
-          </div>
+          {!isExpired && (
+            <div className="rounded-xl border border-white/10 bg-black/20 p-3">
+              <ReportView
+                pdfSrc={pdfSrc}
+                title={approval.reportName}
+                reportDate={reportDate}
+              />
+            </div>
+          )}
 
           {approval.status === "REJECTED" && approval.rejectComment && (
             <div className="mt-4 rounded-xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-200">
               <div className="font-medium">Rejection reason</div>
-              <div className="mt-2 whitespace-pre-wrap">{approval.rejectComment}</div>
+              <div className="mt-2 whitespace-pre-wrap">
+                {approval.rejectComment}
+              </div>
             </div>
           )}
 
