@@ -33,8 +33,7 @@ export default async function FopApprovePage({
   const isPending = approval.status === "PENDING" && !isExpired;
 
   const reportDate = ymd(approval.day);
-  const pdfSrc = `/fop-preview/${approval.reportCode}?date=${reportDate}&rev=${approval.revisionNo}`;
-
+const pdfSrc = `/fop-preview/${approval.reportCode}?date=${reportDate}&rev=${approval.revisionNo}&token=${approval.token}`;
   return (
     <div className="min-h-screen bg-[#07110d] p-6 text-white">
       <div className="mx-auto flex max-w-6xl flex-col items-center gap-6">

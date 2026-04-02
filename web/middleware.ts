@@ -4,11 +4,12 @@ import { getToken } from "next-auth/jwt";
 export async function middleware(req: any) {
   const { pathname, search } = req.nextUrl;
 
-  // javne / tehničke rute koje ne smeju da idu na login
+  // public / technical routes
   if (
     pathname.startsWith("/login") ||
     pathname.startsWith("/api/auth") ||
     pathname.startsWith("/api/fop") ||
+    pathname.startsWith("/ogi/fop/approve") ||
     pathname.startsWith("/fop-preview") ||
     pathname.startsWith("/test-pdf") ||
     pathname.startsWith("/_next") ||
