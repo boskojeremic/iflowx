@@ -21,29 +21,45 @@ export default async function FopApprovePage({
 }) {
   const token = String(searchParams?.token ?? "").trim();
 
-  if (!token) notFound();
+  console.log("APPROVAL PAGE TOKEN:", token);
+
+  if (!token) {
+    console.error("NO TOKEN PROVIDED");
+    notFound();
+  }
 
   const approval = await db.reportApprovalToken.findUnique({
     where: { token },
   });
 
-  if (!approval) notFound();
+  console.log("APPROVAL PAGE RECORD:", approval);
+
+  if (!approval) {
+    console.error("TOKEN NOT FOUND IN DB:", token);
+    notFound();
+  }
 
   const isExpired = approval.expiresAt.getTime() < Date.now();
   const isPending = approval.status === "PENDING" && !isExpired;
 
   const reportDate = ymd(approval.day);
-const pdfSrc = `/fop-preview/${approval.reportCode}?date=${reportDate}&rev=${approval.revisionNo}&token=${approval.token}`;
+
+  const pdfSrc = `/fop-preview/${approval.reportCode}?date=${reportDate}&rev=${approval.revisionNo}&token=${approval.token}`;
+
   return (
     <div className="min-h-screen bg-[#07110d] p-6 text-white">
       <div className="mx-auto flex max-w-6xl flex-col items-center gap-6">
         <div className="w-full max-w-5xl rounded-2xl border border-white/10 bg-white/[0.03] p-5">
           <div className="mb-4 flex items-start justify-between gap-4">
             <div>
-              <div className="text-xl font-semibold">{approval.reportName}</div>
+              <div className="text-xl font-semibold">
+                {approval.reportName}
+              </div>
               <div className="mt-1 text-sm text-white/60">
                 Date: {reportDate} / Revision: {approval.revisionNo}
-                {approval.documentNumber ? ` / ${approval.documentNumber}` : ""}
+                {approval.documentNumber
+                  ? ` / ${approval.documentNumber}`
+                  : ""}
               </div>
             </div>
 
@@ -100,7 +116,10 @@ const pdfSrc = `/fop-preview/${approval.reportCode}?date=${reportDate}&rev=${app
           )}
 
           <div className="mt-5 flex justify-end">
-            <FopApprovalActions token={approval.token} isPending={isPending} />
+            <FopApprovalActions
+              token={approval.token}
+              isPending={isPending}
+            />
           </div>
         </div>
       </div>
