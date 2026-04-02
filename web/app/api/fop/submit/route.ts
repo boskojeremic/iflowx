@@ -8,17 +8,35 @@ function toDateOnly(value: string) {
   return new Date(`${value}T00:00:00`);
 }
 
+function getAppUrl() {
+  const appUrl =
+    process.env.APP_URL ||
+    process.env.NEXT_PUBLIC_APP_URL ||
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "");
+
+  if (!appUrl) {
+    throw new Error(
+      "APP_URL is not configured. Set APP_URL or NEXT_PUBLIC_APP_URL in production."
+    );
+  }
+
+  return appUrl.replace(/\/+$/, "");
+}
+
 async function sendEmailViaResend(params: {
   to: string;
   subject: string;
   html: string;
 }) {
   const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.EMAIL_FROM || "iFlowX <no-reply@example.com>";
+  const from = process.env.EMAIL_FROM;
 
   if (!apiKey) {
-    console.warn("RESEND_API_KEY is missing. Email was not sent.");
-    return;
+    throw new Error("RESEND_API_KEY is missing.");
+  }
+
+  if (!from) {
+    throw new Error("EMAIL_FROM is missing.");
   }
 
   const res = await fetch("https://api.resend.com/emails", {
@@ -44,19 +62,18 @@ async function sendEmailViaResend(params: {
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-
     const formData = await req.formData();
 
-    const tenantId = String(formData.get("tenantId") ?? "");
-    const reportId = String(formData.get("reportId") ?? "");
-    const reportCode = String(formData.get("reportCode") ?? "");
-    const reportName = String(formData.get("reportName") ?? "");
-    const date = String(formData.get("date") ?? "");
+    const tenantId = String(formData.get("tenantId") ?? "").trim();
+    const reportId = String(formData.get("reportId") ?? "").trim();
+    const reportCode = String(formData.get("reportCode") ?? "").trim();
+    const reportName = String(formData.get("reportName") ?? "").trim();
+    const date = String(formData.get("date") ?? "").trim();
     const revisionNo = Number(formData.get("revisionNo") ?? 0);
-    const snapshotId = String(formData.get("snapshotId") ?? "");
-    const documentNumber = String(formData.get("documentNumber") ?? "");
-    const approverUserId = String(formData.get("approverUserId") ?? "");
-    const returnTo = String(formData.get("returnTo") ?? "/ogi/fop");
+    const snapshotId = String(formData.get("snapshotId") ?? "").trim();
+    const documentNumber = String(formData.get("documentNumber") ?? "").trim();
+    const approverUserId = String(formData.get("approverUserId") ?? "").trim();
+    const returnTo = String(formData.get("returnTo") ?? "/ogi/fop").trim();
 
     if (
       !tenantId ||
@@ -127,6 +144,7 @@ export async function POST(req: NextRequest) {
       update: {
         status: "SUBMITTED",
         submittedAt: new Date(),
+        approvedAt: null,
       },
       create: {
         id: crypto.randomUUID(),
@@ -161,12 +179,8 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    const appUrl =
-      process.env.APP_URL ||
-      process.env.NEXT_PUBLIC_APP_URL ||
-      "http://localhost:3001";
-
-const approveLink = `${appUrl}/ogi/fop/approve?token=${token}`;
+    const appUrl = getAppUrl();
+    const approveLink = `${appUrl}/ogi/fop/approve?token=${token}`;
 
     await sendEmailViaResend({
       to: approver.email,
@@ -175,27 +189,26 @@ const approveLink = `${appUrl}/ogi/fop/approve?token=${token}`;
         <div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.5">
           <p>Dear ${approver.name || "Approver"},</p>
           <p>A report requires your approval.</p>
-          <p><strong>Report:</strong> ${reportName}<br/>
-          <strong>Date:</strong> ${date}<br/>
-          <strong>Revision:</strong> ${snapshot.snapshotRevisionNo ?? revisionNo ?? 0}<br/>
-          <strong>Document No:</strong> ${snapshot.documentNumber ?? "-"}</p>
+          <p>
+            <strong>Report:</strong> ${reportName}<br/>
+            <strong>Date:</strong> ${date}<br/>
+            <strong>Revision:</strong> ${snapshot.snapshotRevisionNo ?? revisionNo ?? 0}<br/>
+            <strong>Document No:</strong> ${snapshot.documentNumber ?? "-"}
+          </p>
           <p>
             <a href="${approveLink}" style="display:inline-block;padding:10px 16px;background:#1d4ed8;color:#fff;text-decoration:none;border-radius:6px">
               Open Approval Page
             </a>
           </p>
-          <p>Or open directly:<br/>${approveLink}</p>
           <p>Best regards,<br/>iFlowX System</p>
         </div>
       `,
     });
 
-    return NextResponse.redirect(new URL(returnTo, req.url));
+    const safeReturnTo = returnTo.startsWith("/") ? returnTo : "/ogi/fop";
+    return NextResponse.redirect(new URL(safeReturnTo, getAppUrl()));
   } catch (e) {
-    console.error(e);
-    return NextResponse.json(
-      { error: "Submit failed." },
-      { status: 500 }
-    );
+    console.error("Submit POST failed:", e);
+    return NextResponse.json({ error: "Submit failed." }, { status: 500 });
   }
 }

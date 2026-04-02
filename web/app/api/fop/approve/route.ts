@@ -8,17 +8,35 @@ function formatYmdLocal(date: Date) {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+function getAppUrl() {
+  const appUrl =
+    process.env.APP_URL ||
+    process.env.NEXT_PUBLIC_APP_URL ||
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "");
+
+  if (!appUrl) {
+    throw new Error(
+      "APP_URL is not configured. Set APP_URL or NEXT_PUBLIC_APP_URL in production."
+    );
+  }
+
+  return appUrl.replace(/\/+$/, "");
+}
+
 async function sendEmailViaResend(params: {
   to: string;
   subject: string;
   html: string;
 }) {
   const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.EMAIL_FROM || "iFlowX <no-reply@example.com>";
+  const from = process.env.EMAIL_FROM;
 
   if (!apiKey) {
-    console.warn("RESEND_API_KEY is missing. Email was not sent.");
-    return;
+    throw new Error("RESEND_API_KEY is missing.");
+  }
+
+  if (!from) {
+    throw new Error("EMAIL_FROM is missing.");
   }
 
   const res = await fetch("https://api.resend.com/emails", {
@@ -44,7 +62,7 @@ async function sendEmailViaResend(params: {
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
-    const token = String(formData.get("token") ?? "");
+    const token = String(formData.get("token") ?? "").trim();
 
     if (!token) {
       return NextResponse.json({ error: "Missing token." }, { status: 400 });
@@ -58,10 +76,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid token." }, { status: 404 });
     }
 
+    const approvalPageUrl = new URL(`/ogi/fop/approve?token=${token}`, getAppUrl());
+
     if (approval.status !== "PENDING") {
-      return NextResponse.redirect(
-        new URL(`/ogi/fop/approve?token=${token}`, req.url)
-      );
+      return NextResponse.redirect(approvalPageUrl);
     }
 
     if (approval.expiresAt.getTime() < Date.now()) {
@@ -73,8 +91,30 @@ export async function POST(req: NextRequest) {
         },
       });
 
-      return NextResponse.redirect(
-        new URL(`/ogi/fop/approve?token=${token}`, req.url)
+      return NextResponse.redirect(approvalPageUrl);
+    }
+
+    const existingDayStatus = await db.reportDayStatus.findUnique({
+      where: {
+        tenantId_reportId_day: {
+          tenantId: approval.tenantId,
+          reportId: approval.reportId,
+          day: approval.day,
+        },
+      },
+    });
+
+    if (!existingDayStatus) {
+      console.error("Missing reportDayStatus for approval token", {
+        token: approval.token,
+        tenantId: approval.tenantId,
+        reportId: approval.reportId,
+        day: approval.day,
+      });
+
+      return NextResponse.json(
+        { error: "Report day status record not found." },
+        { status: 404 }
       );
     }
 
@@ -101,10 +141,7 @@ export async function POST(req: NextRequest) {
     });
 
     if (approval.requesterEmail) {
-      const appUrl =
-        process.env.APP_URL ||
-        process.env.NEXT_PUBLIC_APP_URL ||
-        "http://localhost:3001";
+      const appUrl = getAppUrl();
 
       const reportLink =
         `${appUrl}/ogi/fop?report=${approval.reportCode}` +
@@ -139,11 +176,9 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    return NextResponse.redirect(
-      new URL(`/ogi/fop/approve?token=${token}`, req.url)
-    );
+    return NextResponse.redirect(approvalPageUrl);
   } catch (e) {
-    console.error(e);
+    console.error("Approval POST failed:", e);
     return NextResponse.json({ error: "Approve failed." }, { status: 500 });
   }
 }
