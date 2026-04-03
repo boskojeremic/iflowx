@@ -7,6 +7,7 @@ export async function middleware(req: any) {
   // public / technical routes
   if (
     pathname.startsWith("/login") ||
+    pathname.startsWith("/invite") ||
     pathname.startsWith("/api/auth") ||
     pathname.startsWith("/api/fop") ||
     pathname.startsWith("/ogi/fop/approve") ||

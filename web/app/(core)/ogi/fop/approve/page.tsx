@@ -18,9 +18,6 @@ function ymd(d: Date) {
 
 export default async function FopApprovePage({ searchParams }: Props) {
   const sp = await searchParams;
-
-  console.log("APPROVAL PAGE SEARCH PARAMS:", sp);
-
   const token = String(sp?.token ?? "").trim();
 
   console.log("APPROVAL PAGE TOKEN:", token);
@@ -48,15 +45,19 @@ export default async function FopApprovePage({ searchParams }: Props) {
   const pdfSrc = `/fop-preview/${approval.reportCode}?date=${reportDate}&rev=${approval.revisionNo}&token=${approval.token}`;
 
   return (
-    <div className="min-h-screen bg-[#07110d] p-6 text-white">
-      <div className="mx-auto flex max-w-6xl flex-col items-center gap-6">
-        <div className="w-full max-w-5xl rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+    <div className="min-h-screen overflow-y-auto bg-[#07110d] p-6 text-white">
+      <div className="mx-auto flex w-full max-w-6xl flex-col items-center gap-6">
+        <div className="w-full max-w-5xl rounded-2xl border border-white/10 bg-white/[0.03] p-5 pb-24">
           <div className="mb-4 flex items-start justify-between gap-4">
             <div>
-              <div className="text-xl font-semibold">{approval.reportName}</div>
+              <div className="text-xl font-semibold">
+                {approval.reportName}
+              </div>
               <div className="mt-1 text-sm text-white/60">
                 Date: {reportDate} / Revision: {approval.revisionNo}
-                {approval.documentNumber ? ` / ${approval.documentNumber}` : ""}
+                {approval.documentNumber
+                  ? ` / ${approval.documentNumber}`
+                  : ""}
               </div>
             </div>
 
@@ -112,8 +113,11 @@ export default async function FopApprovePage({ searchParams }: Props) {
             </div>
           )}
 
-          <div className="mt-5 flex justify-end">
-            <FopApprovalActions token={approval.token} isPending={isPending} />
+          <div className="mt-5 flex justify-end pb-4">
+            <FopApprovalActions
+              token={approval.token}
+              isPending={isPending}
+            />
           </div>
         </div>
       </div>

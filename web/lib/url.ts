@@ -1,10 +1,10 @@
 import { headers } from "next/headers";
 
 export async function getBaseUrl() {
-  const h = await headers();
+  const url =
+    process.env.APP_URL ||
+    process.env.NEXT_PUBLIC_APP_URL ||
+    "https://app.dig-ops.com";
 
-  const proto = h.get("x-forwarded-proto") ?? "http";
-  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3001";
-
-  return `${proto}://${host}`;
+  return url.replace(/\/$/, "");
 }
