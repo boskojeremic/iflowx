@@ -8,14 +8,23 @@ import { getFopReportData } from "@/lib/fop/get-fop-report-data";
 
 type Props = {
   params: Promise<{ code: string }>;
-  searchParams: Promise<{ date?: string; rev?: string; token?: string }>;
+  searchParams: Promise<{
+    date?: string;
+    rev?: string;
+    token?: string;
+    pdf?: string;
+    key?: string;
+  }>;
 };
 
 function ymd(d: Date) {
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
+  return d.toISOString().slice(0, 10);
+}
+
+function buildUtcDayRange(dateText: string) {
+  const start = new Date(`${dateText}T00:00:00.000Z`);
+  const end = new Date(`${dateText}T23:59:59.999Z`);
+  return { start, end };
 }
 
 export default async function FopPreviewPage({
@@ -27,12 +36,52 @@ export default async function FopPreviewPage({
 
   const reportCode = String(code || "").toUpperCase() as FopReportCode;
   const token = String(sp?.token || "").trim();
+  const pdfMode = String(sp?.pdf || "").trim() === "1";
+  const pdfKey = String(sp?.key || "").trim();
+  const validPdfKey =
+    !!process.env.PDF_INTERNAL_SECRET &&
+    pdfKey === process.env.PDF_INTERNAL_SECRET;
 
   let tenantId: string | null = null;
-  let reportDate = String(sp?.date || "");
+  let reportDate = String(sp?.date || "").trim();
   let revisionNo = Number(sp?.rev ?? 0);
 
-  if (token) {
+  const reportDefinition = await db.reportDefinition.findFirst({
+    where: {
+      code: reportCode,
+    },
+    select: {
+      id: true,
+      code: true,
+    },
+  });
+
+  if (!reportDefinition) notFound();
+
+  if (pdfMode) {
+    if (!validPdfKey) notFound();
+    if (!reportDate) notFound();
+
+    const { start, end } = buildUtcDayRange(reportDate);
+
+    const snapshot = await db.measurementSnapshot.findFirst({
+      where: {
+        reportId: reportDefinition.id,
+        snapshotRevisionNo: revisionNo,
+        snapshotDate: {
+          gte: start,
+          lte: end,
+        },
+      },
+      orderBy: [{ snapshotDate: "desc" }],
+      select: {
+        tenantId: true,
+      },
+    });
+
+    tenantId = snapshot?.tenantId ?? null;
+    if (!tenantId) notFound();
+  } else if (token) {
     const approval = await db.reportApprovalToken.findUnique({
       where: { token },
       select: {
@@ -76,6 +125,25 @@ export default async function FopPreviewPage({
 
     tenantId = user?.memberships?.[0]?.tenantId ?? null;
     if (!tenantId) notFound();
+
+    if (!reportDate) {
+      const latestSnapshot = await db.measurementSnapshot.findFirst({
+        where: {
+          tenantId,
+          reportId: reportDefinition.id,
+        },
+        orderBy: [{ snapshotDate: "desc" }, { snapshotRevisionNo: "desc" }],
+        select: {
+          snapshotDate: true,
+          snapshotRevisionNo: true,
+        },
+      });
+
+      if (!latestSnapshot) notFound();
+
+      reportDate = ymd(latestSnapshot.snapshotDate);
+      revisionNo = latestSnapshot.snapshotRevisionNo ?? 0;
+    }
   }
 
   const reportMeta = FOP_REPORT_META[reportCode] ?? FOP_REPORT_META.DOR;
@@ -87,8 +155,25 @@ export default async function FopPreviewPage({
     revisionNo,
   });
 
-  if (!data) {
-    notFound();
+  if (!data) notFound();
+
+  if (pdfMode) {
+    return (
+      <main
+        style={{
+          margin: 0,
+          padding: 0,
+          background: "#ffffff",
+          minHeight: "100vh",
+        }}
+      >
+        <FopReportTemplate
+          report={reportMeta}
+          reportDate={reportDate}
+          data={data}
+        />
+      </main>
+    );
   }
 
   return (

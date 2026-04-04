@@ -96,3 +96,23 @@ select option {
   background-color: rgb(10, 15, 12);
   color: rgba(255,255,255,0.92);
 }
+@media print {
+  html, body {
+    background: white !important;
+  }
+
+  body {
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  #__next {
+    background: white !important;
+  }
+
+  #pdf-report {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+  }
+}

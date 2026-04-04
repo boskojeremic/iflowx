@@ -7,14 +7,46 @@ import { buildDocumentNumber } from "@/lib/fop/document-number";
 
 export const runtime = "nodejs";
 
+function normalizeReportDate(value: string) {
+  const v = String(value).trim();
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) {
+    return v;
+  }
+
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(v)) {
+    const [day, month, year] = v.split("/");
+    return `${year}-${month}-${day}`;
+  }
+
+  if (/^\d{2}\.\d{2}\.\d{4}$/.test(v)) {
+    const [day, month, year] = v.split(".");
+    return `${year}-${month}-${day}`;
+  }
+
+  throw new Error(`Invalid reportDate format: ${value}`);
+}
+
+function parseYmd(value: string) {
+  const v = String(value).trim();
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) {
+    throw new Error(`Invalid YYYY-MM-DD date: ${value}`);
+  }
+
+  const [year, month, day] = v.split("-").map(Number);
+
+  return { year, month, day };
+}
+
 function toDateOnly(value: string) {
-  return new Date(`${value}T00:00:00`);
+  const { year, month, day } = parseYmd(value);
+  return new Date(Date.UTC(year, month - 1, day, 0, 0, 0));
 }
 
 function nextDayStart(value: string) {
-  const d = new Date(`${value}T00:00:00`);
-  d.setDate(d.getDate() + 1);
-  return d;
+  const { year, month, day } = parseYmd(value);
+  return new Date(Date.UTC(year, month - 1, day + 1, 0, 0, 0));
 }
 
 export async function POST(req: NextRequest) {
@@ -33,7 +65,8 @@ export async function POST(req: NextRequest) {
     const tenantId = String(body?.tenantId || "").trim();
     const reportId = String(body?.reportId || "").trim();
     const reportCode = String(body?.reportCode || "").trim().toUpperCase();
-    const reportDate = String(body?.reportDate || "").trim();
+    const reportDateRaw = String(body?.reportDate || "").trim();
+    const reportDate = normalizeReportDate(reportDateRaw);
 
     if (!tenantId || !reportId || !reportCode || !reportDate) {
       return NextResponse.json(
@@ -87,12 +120,19 @@ export async function POST(req: NextRequest) {
     }
 
     const snapshotDate = toDateOnly(reportDate);
+    const { year, month, day } = parseYmd(reportDate);
+
+const dayStart = new Date(Date.UTC(year, month - 1, day, 0, 0, 0));
+const dayEnd = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999));
 
     const existingSnapshot = await db.measurementSnapshot.findFirst({
       where: {
         tenantId,
         reportId: report.id,
-        snapshotDate,
+        snapshotDate: {
+          gte: dayStart,
+          lte: dayEnd,
+        },
       },
       include: {
         details: true,
@@ -161,6 +201,12 @@ export async function POST(req: NextRequest) {
         },
       }));
 
+    await db.$executeRaw`
+      UPDATE "MeasurementSnapshot"
+      SET "snapshotDate" = ${reportDate}::date
+      WHERE id = ${snapshot.id}
+    `;
+
     const scadaCutoff = nextDayStart(reportDate);
 
     for (const mapping of mappings) {
@@ -169,8 +215,11 @@ export async function POST(req: NextRequest) {
       const exists = await db.measurementSnapshotDetail.findFirst({
         where: {
           measurementSnapshotId: snapshot.id,
-          snapshotDate,
           measurementPointId: mp.id,
+          snapshotDate: {
+            gte: dayStart,
+            lte: dayEnd,
+          },
         },
         select: {
           id: true,
@@ -205,9 +254,11 @@ export async function POST(req: NextRequest) {
         continue;
       }
 
+      const newDetailId = randomUUID();
+
       await db.measurementSnapshotDetail.create({
         data: {
-          id: randomUUID(),
+          id: newDetailId,
           measurementSnapshotId: snapshot.id,
           snapshotDate,
           measurementPointId: mp.id,
@@ -221,39 +272,68 @@ export async function POST(req: NextRequest) {
           updatedBy: activeMembership.userId,
         },
       });
+
+      await db.$executeRaw`
+        UPDATE "MeasurementSnapshotDetail"
+        SET "snapshotDate" = ${reportDate}::date
+        WHERE id = ${newDetailId}
+      `;
     }
 
-    await db.reportDayStatus.upsert({
+    const existingDayStatus = await db.reportDayStatus.findFirst({
       where: {
-        tenantId_reportId_day: {
+        tenantId,
+        reportId: report.id,
+        day: {
+          gte: dayStart,
+          lte: dayEnd,
+        },
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (existingDayStatus) {
+      await db.reportDayStatus.update({
+        where: {
+          id: existingDayStatus.id,
+        },
+        data: {
+          status: "DRAFT",
+          submittedAt: null,
+          submittedBy: null,
+          approvedAt: null,
+          approvedBy: null,
+          lockedAt: null,
+          lockedBy: null,
+        },
+      });
+    } else {
+      await db.reportDayStatus.create({
+        data: {
+          id: randomUUID(),
           tenantId,
           reportId: report.id,
           day: snapshotDate,
+          status: "DRAFT",
+          submittedAt: null,
+          submittedBy: null,
+          approvedAt: null,
+          approvedBy: null,
+          lockedAt: null,
+          lockedBy: null,
         },
-      },
-      update: {
-        status: "DRAFT",
-        submittedAt: null,
-        submittedBy: null,
-        approvedAt: null,
-        approvedBy: null,
-        lockedAt: null,
-        lockedBy: null,
-      },
-      create: {
-        id: randomUUID(),
-        tenantId,
-        reportId: report.id,
-        day: snapshotDate,
-        status: "DRAFT",
-        submittedAt: null,
-        submittedBy: null,
-        approvedAt: null,
-        approvedBy: null,
-        lockedAt: null,
-        lockedBy: null,
-      },
-    });
+      });
+
+      await db.$executeRaw`
+        UPDATE "ReportDayStatus"
+        SET "day" = ${reportDate}::date
+        WHERE "tenantId" = ${tenantId}
+          AND "reportId" = ${report.id}
+          AND "status" = 'DRAFT'
+      `;
+    }
 
     return NextResponse.json({
       ok: true,

@@ -28,7 +28,7 @@ export default function EditableMeasurementTable({ rows }: Props) {
     try {
       setSavingId(detailId);
 
-      const res = await fetch("/api/esg/ghg_inv/update-manual", {
+      const res = await fetch("/api/fop/update-manual", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -51,7 +51,7 @@ export default function EditableMeasurementTable({ rows }: Props) {
       const params = new URLSearchParams(searchParams?.toString() ?? "");
       params.set("_ts", Date.now().toString());
 
-      router.replace(`/gen/esg/ghg_inv?${params.toString()}`);
+      router.replace(`/ogi/fop?${params.toString()}`);
       router.refresh();
     } catch (error) {
       console.error(error);

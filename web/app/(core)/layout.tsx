@@ -1,3 +1,4 @@
+import { headers } from "next/headers";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/authz";
 import { checkUserLicense } from "@/lib/license";
@@ -11,6 +12,32 @@ export default async function CoreAppLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const h = await headers();
+
+  const url =
+    h.get("x-invoke-path") ||
+    h.get("x-matched-path") ||
+    h.get("next-url") ||
+    "";
+
+  const isFopPreview = url.includes("/fop-preview");
+
+  if (isFopPreview) {
+    return (
+      <div
+        style={{
+          margin: 0,
+          padding: 0,
+          background: "#ffffff",
+          width: "100%",
+          minHeight: "100vh",
+        }}
+      >
+        {children}
+      </div>
+    );
+  }
+
   const user = await getCurrentUser();
 
   if (!user) {
@@ -78,7 +105,7 @@ export default async function CoreAppLayout({
     : "NO TENANT";
 
   return (
-    <div className="flex min-h-screen md:h-screen overflow-hidden bg-[#07110d] text-white">
+    <div className="flex min-h-screen overflow-hidden bg-[#07110d] text-white md:h-screen">
       <AppSidebar
         tenantId={tenantId}
         userId={user.id}
@@ -87,7 +114,7 @@ export default async function CoreAppLayout({
         showMasterDataAdmin={showMasterDataAdmin}
       />
 
-      <div className="flex min-h-screen md:h-screen flex-1 min-w-0 flex-col overflow-y-auto md:overflow-hidden bg-[#07110d]">
+      <div className="flex min-h-screen min-w-0 flex-1 flex-col overflow-y-auto bg-[#07110d] md:h-screen md:overflow-hidden">
         <div className="shrink-0 md:hidden">
           <MobileNavClient
             groups={groups}
@@ -98,7 +125,7 @@ export default async function CoreAppLayout({
         </div>
 
         <div className="flex h-14 shrink-0 items-center justify-end gap-2 border-b border-white/10 bg-[#0b0f0d] px-3 sm:px-4 md:px-6">
-          <div className="hidden md:flex items-center gap-2 text-[11px] sm:text-xs">
+          <div className="hidden items-center gap-2 text-[11px] sm:text-xs md:flex">
             <div className="rounded-md border border-white/10 bg-[#151a18] px-3 py-1">
               Tenant: <b>{displayTenant}</b>
             </div>
@@ -121,7 +148,7 @@ export default async function CoreAppLayout({
             )}
           </div>
 
-          <div className="flex md:hidden items-center gap-2 text-[11px]">
+          <div className="flex items-center gap-2 text-[11px] md:hidden">
             <div className="rounded-md border border-white/10 bg-[#151a18] px-2 py-1">
               <b>{membership?.tenant?.code ?? "NO TENANT"}</b>
             </div>
@@ -138,8 +165,8 @@ export default async function CoreAppLayout({
           </div>
         </div>
 
-        <main className="flex-1 overflow-visible md:overflow-hidden bg-[#07110d] p-3 sm:p-4 md:p-6">
-          <div className="mx-auto flex w-full max-w-[1600px] flex-col md:h-full px-0 sm:px-2 md:px-4 lg:px-8">
+        <main className="flex-1 overflow-visible bg-[#07110d] p-3 md:overflow-hidden sm:p-4 md:p-6">
+          <div className="mx-auto flex w-full max-w-[1600px] flex-col px-0 sm:px-2 md:h-full md:px-4 lg:px-8">
             {children}
           </div>
         </main>

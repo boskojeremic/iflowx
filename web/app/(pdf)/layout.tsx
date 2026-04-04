@@ -3,5 +3,15 @@ export default function PdfLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return <div style={{ margin: 0, background: "#ffffff" }}>{children}</div>;
+  return (
+    <div
+      style={{
+        margin: 0,
+        padding: 0,
+        background: "#ffffff",
+      }}
+    >
+      {children}
+    </div>
+  );
 }

@@ -5,7 +5,8 @@ import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
 
 function toDateOnly(value: string) {
-  return new Date(`${value}T00:00:00`);
+  const [year, month, day] = value.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
 }
 
 function getAppUrl() {

@@ -32,24 +32,60 @@ type SearchParams = Promise<{
   cpTag?: string;
 }>;
 
-function todayYmd() {
+function yesterdayYmd() {
   const d = new Date();
+  d.setDate(d.getDate() - 1);
+
   const yyyy = d.getFullYear();
   const mm = String(d.getMonth() + 1).padStart(2, "0");
   const dd = String(d.getDate()).padStart(2, "0");
+
   return `${yyyy}-${mm}-${dd}`;
 }
 
+function normalizeYmd(value: string) {
+  const v = String(value).trim();
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) {
+    return v;
+  }
+
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(v)) {
+    const [day, month, year] = v.split("/");
+    return `${year}-${month}-${day}`;
+  }
+
+  if (/^\d{2}\.\d{2}\.\d{4}$/.test(v)) {
+    const [day, month, year] = v.split(".");
+    return `${year}-${month}-${day}`;
+  }
+
+  throw new Error(`Invalid date format: ${value}`);
+}
+
+function parseYmd(value: string) {
+  const v = normalizeYmd(value);
+  const [year, month, day] = v.split("-").map(Number);
+  return { year, month, day };
+}
+
 function toDateOnly(value: string) {
-  return new Date(`${value}T00:00:00`);
+  const { year, month, day } = parseYmd(value);
+  return new Date(Date.UTC(year, month - 1, day, 0, 0, 0));
+}
+
+function getDayRange(value: string) {
+  const { year, month, day } = parseYmd(value);
+
+  return {
+    gte: new Date(Date.UTC(year, month - 1, day, 0, 0, 0)),
+    lte: new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999)),
+  };
 }
 
 function ymd(value: Date | string) {
   const d = new Date(value);
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
+  return d.toISOString().slice(0, 10);
 }
 
 function displayValue(
@@ -109,7 +145,8 @@ export default async function FieldOperationsPage({
   const mainTab = String(sp?.tab ?? "data-entry").toLowerCase();
   const rightTab = String(sp?.rightTab ?? "report").toLowerCase();
   const selectedReportCode = String(sp?.report ?? "").toUpperCase();
-  const selectedDate = String(sp?.date ?? todayYmd());
+  const rawSelectedDate = String(sp?.date ?? "").trim();
+const selectedDate = normalizeYmd(rawSelectedDate || yesterdayYmd());
   const selectedRevisionParam = sp?.rev;
 
   const historyQuery = String(sp?.hq ?? "").trim();
@@ -124,6 +161,8 @@ export default async function FieldOperationsPage({
   const selectedRevision = hasSelectedRevision
     ? Number(selectedRevisionParam)
     : null;
+
+  const selectedDayRange = getDayRange(selectedDate);
 
   const moduleItem = await db.module.findFirst({
     where: {
@@ -260,7 +299,7 @@ export default async function FieldOperationsPage({
     ? await db.reportDayStatus.findMany({
         where: {
           tenantId: tenant.id,
-          day: toDateOnly(selectedDate),
+          day: selectedDayRange,
           status: "APPROVED",
           reportDefinition: {
             tenantId: tenant.id,
@@ -317,7 +356,7 @@ export default async function FieldOperationsPage({
           where: {
             tenantId: tenant.id,
             reportId: activeDataEntryReport.id,
-            snapshotDate: toDateOnly(selectedDate),
+            snapshotDate: selectedDayRange,
           },
           orderBy: [{ snapshotRevisionNo: "desc" }],
           select: {
@@ -334,7 +373,7 @@ export default async function FieldOperationsPage({
           where: {
             tenantId: tenant.id,
             reportId: activeDataEntryReport.id,
-            snapshotDate: toDateOnly(selectedDate),
+            snapshotDate: selectedDayRange,
             ...(selectedRevision !== null
               ? { snapshotRevisionNo: selectedRevision }
               : {}),
@@ -360,13 +399,11 @@ export default async function FieldOperationsPage({
 
   const currentDayStatus =
     tenant && activeDataEntryReport
-      ? await db.reportDayStatus.findUnique({
+      ? await db.reportDayStatus.findFirst({
           where: {
-            tenantId_reportId_day: {
-              tenantId: tenant.id,
-              reportId: activeDataEntryReport.id,
-              day: toDateOnly(selectedDate),
-            },
+            tenantId: tenant.id,
+            reportId: activeDataEntryReport.id,
+            day: selectedDayRange,
           },
           select: {
             status: true,
@@ -380,7 +417,7 @@ export default async function FieldOperationsPage({
           where: {
             tenantId: tenant.id,
             reportId: activeDataEntryReport.id,
-            day: toDateOnly(selectedDate),
+            day: selectedDayRange,
           },
           orderBy: [{ createdAt: "desc" }],
           select: {
@@ -418,6 +455,13 @@ export default async function FieldOperationsPage({
       ? "Submitted for Approval"
       : "Draft";
 
+      const submittedReportsCount =
+  currentDayStatus?.status === "SUBMITTED" ||
+  currentDayStatus?.status === "APPROVED"
+    ? 1
+    : 0;
+
+const rejectedReportsCount = currentDayStatus?.status === "REJECTED" ? 1 : 0;
   const snapshotExists = !!snapshot;
   const snapshotHasDetails = !!snapshot && snapshot.details.length > 0;
 
@@ -632,7 +676,7 @@ export default async function FieldOperationsPage({
     selectedRevisionValue ? `&rev=${selectedRevisionValue}` : ""
   }`;
 
-    const snapshotsForCharts =
+  const snapshotsForCharts =
     tenant && activeDataEntryReport
       ? await db.measurementSnapshot.findMany({
           where: {
@@ -673,7 +717,7 @@ export default async function FieldOperationsPage({
     (s) => s.id
   );
 
-   const chartSeriesRaw =
+  const chartSeriesRaw =
     tenant && selectedCheckPointRow && latestSnapshotIdsForCharts.length > 0
       ? await db.measurementSnapshotDetail.findMany({
           where: {
@@ -697,7 +741,7 @@ export default async function FieldOperationsPage({
         })
       : [];
 
-    const chartPoints: ChartPoint[] = chartSeriesRaw
+  const chartPoints: ChartPoint[] = chartSeriesRaw
     .map((d) => {
       const raw =
         d.mpValueFloat !== null && d.mpValueFloat !== undefined
@@ -752,9 +796,11 @@ export default async function FieldOperationsPage({
     previewTs ? `&_ts=${previewTs}` : ""
   }${selectedRevisionValue ? `&rev=${selectedRevisionValue}` : ""}`;
 
-  const activePreviewPdfSrc = `/api/fop/pdf/${activePreviewCode}_${selectedDate}.pdf${
-    previewTs ? `?ts=${previewTs}` : ""
-  }`;
+    const activePreviewPdfSrc = snapshot?.documentNumber
+    ? `/api/fop/pdf/${encodeURIComponent(snapshot.documentNumber)}.pdf${
+        previewTs ? `?ts=${previewTs}` : ""
+      }`
+    : "";
 
   const baseQuery = `report=${currentReportCode}&date=${selectedDate}${
     selectedRevisionValue ? `&rev=${selectedRevisionValue}` : ""
@@ -1094,31 +1140,26 @@ export default async function FieldOperationsPage({
               </div>
 
               <div className="mt-4 grid gap-3 md:grid-cols-2">
-                <div className="rounded-xl border border-white/10 bg-black/20 p-4 text-center">
-                  <div className="text-xs uppercase tracking-wide text-white/45">
-                    Submitted Reports
-                  </div>
-                  <div className="mt-2 text-4xl font-semibold">
-                    {currentDayStatus?.status === "SUBMITTED" ||
-                    currentDayStatus?.status === "APPROVED"
-                      ? 1
-                      : 0}
-                  </div>
-                  <div className="mt-1 text-sm text-white/60">
-                    {reportDisplayStatus}
-                  </div>
-                </div>
+  <div className="rounded-xl border border-white/10 bg-black/20 p-4 text-center">
+    <div className="text-xs uppercase tracking-wide text-white/45">
+      Submitted Reports
+    </div>
+    <div className="mt-2 text-4xl font-semibold">{submittedReportsCount}</div>
+    <div className="mt-1 text-sm text-white/60">
+      {submittedReportsCount > 0 ? reportDisplayStatus : "Draft"}
+    </div>
+  </div>
 
-                <div className="rounded-xl border border-white/10 bg-black/20 p-4 text-center">
-                  <div className="text-xs uppercase tracking-wide text-white/45">
-                    Rejected Reports
-                  </div>
-                  <div className="mt-2 text-4xl font-semibold">0</div>
-                  <div className="mt-1 text-sm text-white/60">
-                    Rejected Reports
-                  </div>
-                </div>
-              </div>
+  <div className="rounded-xl border border-white/10 bg-black/20 p-4 text-center">
+    <div className="text-xs uppercase tracking-wide text-white/45">
+      Rejected Reports
+    </div>
+    <div className="mt-2 text-4xl font-semibold">{rejectedReportsCount}</div>
+    <div className="mt-1 text-sm text-white/60">
+      {rejectedReportsCount > 0 ? reportDisplayStatus : "Rejected Reports"}
+    </div>
+  </div>
+</div>
 
               <div className="mt-4 rounded-xl border border-white/10 bg-black/20 p-3">
                 <div className="grid items-end gap-3 md:grid-cols-[1fr_auto]">
@@ -1594,6 +1635,8 @@ export default async function FieldOperationsPage({
                       reportTitle={activePreviewTitle}
                       reportDate={selectedDate}
                       pdfUrl={activePreviewPdfSrc}
+                      documentNumber={snapshot?.documentNumber ?? ""}
+                      revisionNo={snapshot?.snapshotRevisionNo ?? 0}
                     />
                   </div>
 

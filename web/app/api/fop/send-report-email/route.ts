@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import fs from "node:fs/promises";
-import path from "node:path";
 import { Resend } from "resend";
-import { FOP_PDF_DIR } from "@/lib/fop-pdf-path";
+import { buildFopPdf } from "@/lib/fop/build-fop-pdf";
 
 export const runtime = "nodejs";
 
@@ -19,44 +17,6 @@ function splitEmails(value: string) {
     .filter(Boolean);
 }
 
-async function ensurePdfExists(reportCode: string, reportDate: string) {
-  const fileName = `${reportCode}_${reportDate}.pdf`;
-  const filePath = path.join(FOP_PDF_DIR, fileName);
-
-  try {
-    await fs.access(filePath);
-    return { fileName, filePath };
-  } catch {
-    const baseUrl =
-      process.env.APP_URL ||
-      process.env.NEXT_PUBLIC_APP_URL ||
-      "http://localhost:3001";
-
-    const generateRes = await fetch(`${baseUrl}/api/fop/generate-pdf`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        reportCode,
-        reportDate,
-      }),
-      cache: "no-store",
-    });
-
-    const generateData = await generateRes.json().catch(() => null);
-
-    if (!generateRes.ok || !generateData?.ok) {
-      throw new Error(
-        generateData?.error || "Failed to auto-generate PDF before sending email."
-      );
-    }
-
-    await fs.access(filePath);
-    return { fileName, filePath };
-  }
-}
-
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -69,6 +29,8 @@ export async function POST(req: NextRequest) {
     const reportCode = safe(body?.reportCode || "DOR").toUpperCase();
     const reportDate = safe(body?.reportDate || "");
     const reportTitle = String(body?.reportTitle || reportCode).trim();
+    const documentNumber = String(body?.documentNumber || "").trim();
+    const revisionNo = Number(body?.revisionNo ?? 0);
 
     if (!to.length) {
       return NextResponse.json(
@@ -84,11 +46,33 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { fileName, filePath } = await ensurePdfExists(reportCode, reportDate);
-    const pdfBuffer = await fs.readFile(filePath);
+    if (!documentNumber) {
+      return NextResponse.json(
+        { ok: false, error: "Document Number is required." },
+        { status: 400 }
+      );
+    }
+
+    if (Number.isNaN(revisionNo)) {
+      return NextResponse.json(
+        { ok: false, error: "Revision Number is invalid." },
+        { status: 400 }
+      );
+    }
+
+    if (!process.env.EMAIL_FROM) {
+      throw new Error("EMAIL_FROM is not configured.");
+    }
+
+    const { fileName, pdfBytes } = await buildFopPdf({
+      reportCode,
+      reportDate,
+      documentNumber,
+      revisionNo,
+    });
 
     const sendResult = await resend.emails.send({
-      from: process.env.EMAIL_FROM!,
+      from: process.env.EMAIL_FROM,
       to,
       cc: cc.length ? cc : undefined,
       subject: subject || `${reportTitle} - ${reportDate}`,
@@ -96,7 +80,7 @@ export async function POST(req: NextRequest) {
       attachments: [
         {
           filename: fileName,
-          content: pdfBuffer.toString("base64"),
+          content: Buffer.from(pdfBytes).toString("base64"),
         },
       ],
     });
