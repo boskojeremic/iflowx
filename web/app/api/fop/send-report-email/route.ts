@@ -80,10 +80,11 @@ console.log("WORKER_SHARED_SECRET =", process.env.WORKER_SHARED_SECRET);
         "x-worker-secret": workerSecret,
       },
       body: JSON.stringify({
-        reportCode,
-        reportDate,
-        revisionNo,
-      }),
+  reportCode,
+  reportDate,
+  revisionNo,
+  documentNumber,
+}),
     });
 
     if (!workerRes.ok) {
@@ -93,7 +94,7 @@ console.log("WORKER_SHARED_SECRET =", process.env.WORKER_SHARED_SECRET);
 
     const pdfArrayBuffer = await workerRes.arrayBuffer();
     const pdfBuffer = Buffer.from(pdfArrayBuffer);
-    const fileName = `${reportCode}-${reportDate}-R${revisionNo}.pdf`;
+    const fileName = `${documentNumber}.pdf`;
 
     const sendResult = await resend.emails.send({
       from: process.env.EMAIL_FROM,
