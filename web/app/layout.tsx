@@ -1,7 +1,6 @@
 import "./globals.css";
+import type { ReactNode } from "react";
 import type { Viewport } from "next";
-import { getPortalNavForUserTenant } from "@/lib/portal-nav";
-import MobileNavClient from "@/components/MobileNavClient";
 import { Toaster } from "sonner";
 
 export const viewport: Viewport = {
@@ -12,7 +11,7 @@ export const viewport: Viewport = {
 export default function RootLayout({
   children,
 }: {
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
     <html lang="en" suppressHydrationWarning>

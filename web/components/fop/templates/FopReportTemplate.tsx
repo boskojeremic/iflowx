@@ -115,16 +115,17 @@ export default function FopReportTemplate({
 
   return (
     <div
-      id="pdf-report"
-      style={{
-        width: "100%",
-        margin: 0,
-        padding: 0,
-        background: "#ffffff",
-        boxSizing: "border-box",
-      }}
-      className="text-slate-900"
-    >
+  id="pdf-report"
+  style={{
+    width: "100%",
+    margin: 0,
+    padding: 0,
+    background: "#ffffff",
+    boxSizing: "border-box",
+    minHeight: "100vh",
+  }}
+  className="text-slate-900"
+>
       <div
         style={{
           width: "100%",

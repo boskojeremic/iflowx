@@ -115,4 +115,26 @@ select option {
     padding: 0 !important;
     width: 100% !important;
   }
+  /* Force light canvas when PDF preview/report is present */
+html:has(#pdf-report),
+body:has(#pdf-report) {
+  background: #ffffff !important;
+}
+
+:root:has(#pdf-report) {
+  color-scheme: light !important;
+}
+
+body:has(#pdf-report) {
+  margin: 0 !important;
+  padding: 0 !important;
+  color: #0f172a !important;
+  background-image: none !important;
+}
+
+body:has(#pdf-report) #__next,
+body:has(#pdf-report) main,
+body:has(#pdf-report) [data-nextjs-scroll-focus-boundary] {
+  background: #ffffff !important;
+}
 }
