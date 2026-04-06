@@ -64,7 +64,8 @@ console.log("WORKER_SHARED_SECRET =", process.env.WORKER_SHARED_SECRET);
     if (!process.env.EMAIL_FROM) {
       throw new Error("EMAIL_FROM is not configured.");
     }
-
+console.log("PDF_WORKER_URL =", process.env.PDF_WORKER_URL);
+console.log("WORKER_SHARED_SECRET =", process.env.WORKER_SHARED_SECRET);
     const workerUrl = process.env.PDF_WORKER_URL;
     const workerSecret = process.env.WORKER_SHARED_SECRET;
 
