@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
-import { buildFopPdf } from "@/lib/fop/build-fop-pdf";
 
 export const runtime = "nodejs";
 
@@ -18,6 +17,8 @@ function splitEmails(value: string) {
 }
 
 export async function POST(req: NextRequest) {
+  console.log("PDF_WORKER_URL =", process.env.PDF_WORKER_URL);
+console.log("WORKER_SHARED_SECRET =", process.env.WORKER_SHARED_SECRET);
   try {
     const body = await req.json();
 
@@ -64,12 +65,34 @@ export async function POST(req: NextRequest) {
       throw new Error("EMAIL_FROM is not configured.");
     }
 
-    const { fileName, pdfBytes } = await buildFopPdf({
-      reportCode,
-      reportDate,
-      documentNumber,
-      revisionNo,
+    const workerUrl = process.env.PDF_WORKER_URL;
+    const workerSecret = process.env.WORKER_SHARED_SECRET;
+
+    if (!workerUrl || !workerSecret) {
+      throw new Error("PDF_WORKER_URL or WORKER_SHARED_SECRET not configured.");
+    }
+
+    const workerRes = await fetch(`${workerUrl}/generate-fop-pdf`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-worker-secret": workerSecret,
+      },
+      body: JSON.stringify({
+        reportCode,
+        reportDate,
+        revisionNo,
+      }),
     });
+
+    if (!workerRes.ok) {
+      const text = await workerRes.text();
+      throw new Error(`PDF worker error: ${text}`);
+    }
+
+    const pdfArrayBuffer = await workerRes.arrayBuffer();
+    const pdfBuffer = Buffer.from(pdfArrayBuffer);
+    const fileName = `${reportCode}-${reportDate}-R${revisionNo}.pdf`;
 
     const sendResult = await resend.emails.send({
       from: process.env.EMAIL_FROM,
@@ -80,7 +103,7 @@ export async function POST(req: NextRequest) {
       attachments: [
         {
           filename: fileName,
-          content: Buffer.from(pdfBytes).toString("base64"),
+          content: pdfBuffer.toString("base64"),
         },
       ],
     });

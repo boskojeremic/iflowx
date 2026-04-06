@@ -122,8 +122,8 @@ export async function POST(req: NextRequest) {
     const snapshotDate = toDateOnly(reportDate);
     const { year, month, day } = parseYmd(reportDate);
 
-const dayStart = new Date(Date.UTC(year, month - 1, day, 0, 0, 0));
-const dayEnd = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999));
+    const dayStart = new Date(Date.UTC(year, month - 1, day, 0, 0, 0));
+    const dayEnd = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999));
 
     const existingSnapshot = await db.measurementSnapshot.findFirst({
       where: {
@@ -179,139 +179,116 @@ const dayEnd = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999));
 
     const revision = 0;
     const documentNumber = buildDocumentNumber(reportCode, reportDate, revision);
-
-    const snapshot =
-      existingSnapshot ??
-      (await db.measurementSnapshot.create({
-        data: {
-          id: randomUUID(),
-          tenantId,
-          snapshotDate,
-          reportId: report.id,
-          snapshotRevisionNo: revision,
-          snapshotNumber: 1,
-          documentNumber,
-          snapComment: null,
-          responsibleUserId: activeMembership.userId,
-          approverUserId: null,
-          contributorUserId: null,
-          informerUserId: null,
-          createdBy: activeMembership.userId,
-          updatedBy: activeMembership.userId,
-        },
-      }));
-
-    await db.$executeRaw`
-      UPDATE "MeasurementSnapshot"
-      SET "snapshotDate" = ${reportDate}::date
-      WHERE id = ${snapshot.id}
-    `;
-
     const scadaCutoff = nextDayStart(reportDate);
 
-    for (const mapping of mappings) {
-      const mp = mapping.measurementPoint;
-
-      const exists = await db.measurementSnapshotDetail.findFirst({
-        where: {
-          measurementSnapshotId: snapshot.id,
-          measurementPointId: mp.id,
-          snapshotDate: {
-            gte: dayStart,
-            lte: dayEnd,
+    const snapshot = await db.$transaction(async (tx) => {
+      const snapshotRecord =
+        existingSnapshot ??
+        (await tx.measurementSnapshot.create({
+          data: {
+            id: randomUUID(),
+            tenantId,
+            snapshotDate,
+            reportId: report.id,
+            snapshotRevisionNo: revision,
+            snapshotNumber: 1,
+            documentNumber,
+            snapComment: null,
+            responsibleUserId: activeMembership.userId,
+            approverUserId: null,
+            contributorUserId: null,
+            informerUserId: null,
+            createdBy: activeMembership.userId,
+            updatedBy: activeMembership.userId,
           },
-        },
-        select: {
-          id: true,
-        },
-      });
+        }));
 
-      if (exists) continue;
+      await tx.$executeRaw`
+        UPDATE "MeasurementSnapshot"
+        SET "snapshotDate" = ${reportDate}::date
+        WHERE id = ${snapshotRecord.id}
+      `;
 
-      const sourceName = (mp.mpSource?.sourceName ?? "UNDEFINED").toUpperCase();
+      for (const mapping of mappings) {
+        const mp = mapping.measurementPoint;
 
-      let mpValueFloat: number | null = null;
-      let mpValueInt: number | null = null;
-      let mpValueText: string | null = null;
+        const exists = await tx.measurementSnapshotDetail.findFirst({
+          where: {
+            measurementSnapshotId: snapshotRecord.id,
+            measurementPointId: mp.id,
+            snapshotDate: {
+              gte: dayStart,
+              lte: dayEnd,
+            },
+          },
+          select: {
+            id: true,
+          },
+        });
 
-      if (sourceName === "SCADA") {
-        const scadaRow = await db.$queryRaw<Array<{ m_value: number | null }>>`
-          SELECT m_value
-          FROM scada_measurements
-          WHERE tenant_id = ${tenantId}
-            AND measurement_point_id = ${mp.id}
-            AND measure_dt < ${scadaCutoff}
-          ORDER BY measure_dt DESC
-          LIMIT 1
+        if (exists) continue;
+
+        const sourceName = (mp.mpSource?.sourceName ?? "UNDEFINED").toUpperCase();
+
+        let mpValueFloat: number | null = null;
+        let mpValueInt: number | null = null;
+        let mpValueText: string | null = null;
+
+        if (sourceName === "SCADA") {
+          const scadaRow = await tx.$queryRaw<Array<{ m_value: number | null }>>`
+            SELECT m_value
+            FROM scada_measurements
+            WHERE tenant_id = ${tenantId}
+              AND measurement_point_id = ${mp.id}
+              AND measure_dt < ${scadaCutoff}
+            ORDER BY measure_dt DESC
+            LIMIT 1
+          `;
+
+          mpValueFloat = scadaRow[0]?.m_value ?? 0;
+        } else if (sourceName === "MANUAL") {
+          mpValueFloat = 0;
+        } else if (sourceName === "CALCULATED") {
+          mpValueFloat = 0;
+        } else {
+          continue;
+        }
+
+        const newDetailId = randomUUID();
+
+        await tx.measurementSnapshotDetail.create({
+          data: {
+            id: newDetailId,
+            measurementSnapshotId: snapshotRecord.id,
+            snapshotDate,
+            measurementPointId: mp.id,
+            mpValueFloat,
+            mpValueInt,
+            mpValueText,
+            minus1dMpValueFloat: null,
+            minus1dMpValueInt: null,
+            minus1dMpValueText: null,
+            createdBy: activeMembership.userId,
+            updatedBy: activeMembership.userId,
+          },
+        });
+
+        await tx.$executeRaw`
+          UPDATE "MeasurementSnapshotDetail"
+          SET "snapshotDate" = ${reportDate}::date
+          WHERE id = ${newDetailId}
         `;
-
-        mpValueFloat = scadaRow[0]?.m_value ?? 0;
-      } else if (sourceName === "MANUAL") {
-        mpValueFloat = 0;
-      } else if (sourceName === "CALCULATED") {
-        mpValueFloat = 0;
-      } else {
-        continue;
       }
 
-      const newDetailId = randomUUID();
-
-      await db.measurementSnapshotDetail.create({
-        data: {
-          id: newDetailId,
-          measurementSnapshotId: snapshot.id,
-          snapshotDate,
-          measurementPointId: mp.id,
-          mpValueFloat,
-          mpValueInt,
-          mpValueText,
-          minus1dMpValueFloat: null,
-          minus1dMpValueInt: null,
-          minus1dMpValueText: null,
-          createdBy: activeMembership.userId,
-          updatedBy: activeMembership.userId,
-        },
-      });
-
-      await db.$executeRaw`
-        UPDATE "MeasurementSnapshotDetail"
-        SET "snapshotDate" = ${reportDate}::date
-        WHERE id = ${newDetailId}
-      `;
-    }
-
-    const existingDayStatus = await db.reportDayStatus.findFirst({
-      where: {
-        tenantId,
-        reportId: report.id,
-        day: {
-          gte: dayStart,
-          lte: dayEnd,
-        },
-      },
-      select: {
-        id: true,
-      },
-    });
-
-    if (existingDayStatus) {
-      await db.reportDayStatus.update({
+      await tx.reportDayStatus.upsert({
         where: {
-          id: existingDayStatus.id,
+          tenantId_reportId_day: {
+            tenantId,
+            reportId: report.id,
+            day: snapshotDate,
+          },
         },
-        data: {
-          status: "DRAFT",
-          submittedAt: null,
-          submittedBy: null,
-          approvedAt: null,
-          approvedBy: null,
-          lockedAt: null,
-          lockedBy: null,
-        },
-      });
-    } else {
-      await db.reportDayStatus.create({
-        data: {
+        create: {
           id: randomUUID(),
           tenantId,
           reportId: report.id,
@@ -324,16 +301,27 @@ const dayEnd = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999));
           lockedAt: null,
           lockedBy: null,
         },
+        update: {
+          status: "DRAFT",
+          submittedAt: null,
+          submittedBy: null,
+          approvedAt: null,
+          approvedBy: null,
+          lockedAt: null,
+          lockedBy: null,
+        },
       });
 
-      await db.$executeRaw`
+      await tx.$executeRaw`
         UPDATE "ReportDayStatus"
         SET "day" = ${reportDate}::date
         WHERE "tenantId" = ${tenantId}
           AND "reportId" = ${report.id}
-          AND "status" = 'DRAFT'
+          AND "day" = ${snapshotDate}
       `;
-    }
+
+      return snapshotRecord;
+    });
 
     return NextResponse.json({
       ok: true,
