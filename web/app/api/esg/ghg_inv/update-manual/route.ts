@@ -16,9 +16,21 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const user = await db.user.findUnique({
+      where: { email: session.user.email },
+      select: { id: true },
+    });
+
+    if (!user?.id) {
+      return NextResponse.json(
+        { ok: false, error: "User not found." },
+        { status: 401 }
+      );
+    }
+
     const body = await req.json();
 
-    const detailId = String(body?.detailId || "").trim();
+    const detailId = String(body?.detailId ?? "").trim();
     const valueRaw = body?.value;
 
     if (!detailId) {
@@ -35,11 +47,19 @@ export async function POST(req: NextRequest) {
     if (valueRaw === "" || valueRaw === null || valueRaw === undefined) {
       mpValueFloat = 0;
     } else {
-      const parsed = Number(valueRaw);
+      const normalized =
+        typeof valueRaw === "string" ? valueRaw.trim().replace(",", ".") : valueRaw;
+
+      const parsed = Number(normalized);
+
       if (Number.isFinite(parsed)) {
         mpValueFloat = parsed;
+        mpValueInt = null;
+        mpValueText = null;
       } else {
-        mpValueText = String(valueRaw);
+        mpValueFloat = null;
+        mpValueInt = null;
+        mpValueText = String(valueRaw).trim();
       }
     }
 
@@ -49,6 +69,7 @@ export async function POST(req: NextRequest) {
         mpValueFloat,
         mpValueInt,
         mpValueText,
+        updatedBy: user.id,
       },
     });
 

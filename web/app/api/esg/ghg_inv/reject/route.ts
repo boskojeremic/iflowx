@@ -8,17 +8,35 @@ function formatYmdLocal(date: Date) {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+function getAppUrl() {
+  const appUrl =
+    process.env.APP_URL ||
+    process.env.NEXT_PUBLIC_APP_URL ||
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "");
+
+  if (!appUrl) {
+    throw new Error(
+      "APP_URL is not configured. Set APP_URL or NEXT_PUBLIC_APP_URL in production."
+    );
+  }
+
+  return appUrl.replace(/\/+$/, "");
+}
+
 async function sendEmailViaResend(params: {
   to: string;
   subject: string;
   html: string;
 }) {
   const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.EMAIL_FROM || "iFlowX <no-reply@example.com>";
+  const from = process.env.EMAIL_FROM;
 
   if (!apiKey) {
-    console.warn("RESEND_API_KEY is missing. Email was not sent.");
-    return;
+    throw new Error("RESEND_API_KEY is missing.");
+  }
+
+  if (!from) {
+    throw new Error("EMAIL_FROM is missing.");
   }
 
   const res = await fetch("https://api.resend.com/emails", {
@@ -44,7 +62,7 @@ async function sendEmailViaResend(params: {
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
-    const token = String(formData.get("token") ?? "");
+    const token = String(formData.get("token") ?? "").trim();
     const comment = String(formData.get("comment") ?? "").trim();
 
     if (!token || !comment) {
@@ -62,10 +80,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid token." }, { status: 404 });
     }
 
+    const approvalPageUrl = new URL(
+      `/gen/esg/ghg_inv/approve?token=${token}`,
+      getAppUrl()
+    );
+
     if (approval.status !== "PENDING") {
-      return NextResponse.redirect(
-        new URL(`/gen/esg/ghg_inv/approve?token=${token}`, req.url)
-      );
+      return NextResponse.redirect(approvalPageUrl);
     }
 
     if (approval.expiresAt.getTime() < Date.now()) {
@@ -77,8 +98,23 @@ export async function POST(req: NextRequest) {
         },
       });
 
-      return NextResponse.redirect(
-        new URL(`/gen/esg/ghg_inv/approve?token=${token}`, req.url)
+      return NextResponse.redirect(approvalPageUrl);
+    }
+
+    const existingDayStatus = await db.reportDayStatus.findUnique({
+      where: {
+        tenantId_reportId_day: {
+          tenantId: approval.tenantId,
+          reportId: approval.reportId,
+          day: approval.day,
+        },
+      },
+    });
+
+    if (!existingDayStatus) {
+      return NextResponse.json(
+        { error: "Report day status record not found." },
+        { status: 404 }
       );
     }
 
@@ -92,6 +128,7 @@ export async function POST(req: NextRequest) {
       },
       data: {
         status: "REJECTED",
+        approvedAt: null,
       },
     });
 
@@ -105,60 +142,55 @@ export async function POST(req: NextRequest) {
     });
 
     if (approval.requesterEmail) {
-      try {
-        const appUrl =
-          process.env.APP_URL ||
-          process.env.NEXT_PUBLIC_APP_URL ||
-          "http://localhost:3001";
+      const appUrl = getAppUrl();
 
-        const reportLink =
-          `${appUrl}/gen/esg/ghg_inv?report=${approval.reportCode}` +
-          `&date=${formatYmdLocal(approval.day)}` +
-          `&rev=${approval.revisionNo}`;
+      const reportLink =
+        `${appUrl}/gen/esg/ghg_inv?report=${approval.reportCode}` +
+        `&date=${formatYmdLocal(approval.day)}` +
+        `&rev=${approval.revisionNo}`;
 
-        await sendEmailViaResend({
-          to: approval.requesterEmail,
-          subject: `Rejected: ${approval.reportName} / ${approval.documentNumber ?? approval.reportCode}`,
-          html: `
-            <div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.5">
-              <p>Dear ${approval.requesterName || "User"},</p>
+      await sendEmailViaResend({
+        to: approval.requesterEmail,
+        subject: `Rejected: ${approval.reportName} / ${
+          approval.documentNumber ?? approval.reportCode
+        }`,
+        html: `
+          <div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.5">
+            <p>Dear ${approval.requesterName || "User"},</p>
 
-              <p>Your submitted report has been <strong>REJECTED</strong>.</p>
+            <p>Your submitted report has been <strong>REJECTED</strong>.</p>
 
-              <p>
-                <strong>Report:</strong> ${approval.reportName}<br/>
-                <strong>Date:</strong> ${formatYmdLocal(approval.day)}<br/>
-                <strong>Revision:</strong> ${approval.revisionNo}<br/>
-                <strong>Document No:</strong> ${approval.documentNumber ?? "-"}
-              </p>
+            <p>
+              <strong>Report:</strong> ${approval.reportName}<br/>
+              <strong>Date:</strong> ${formatYmdLocal(approval.day)}<br/>
+              <strong>Revision:</strong> ${approval.revisionNo}<br/>
+              <strong>Document No:</strong> ${
+                approval.documentNumber ?? "-"
+              }
+            </p>
 
-              <p><strong>Reason for rejection:</strong></p>
-              <div style="padding:10px;border:1px solid #ddd;border-radius:6px;background:#fafafa;">
-                ${comment.replace(/\n/g, "<br/>")}
-              </div>
-
-              <p style="margin-top:16px;">
-                Please create a <strong>new revision</strong>, update the report accordingly, and submit it again for approval.
-              </p>
-
-              <p>
-                <a href="${reportLink}" style="display:inline-block;padding:10px 16px;background:#1d4ed8;color:#fff;text-decoration:none;border-radius:6px">
-                  Open Report
-                </a>
-              </p>
-
-              <p>Best regards,<br/>iFlowX System</p>
+            <p><strong>Reason for rejection:</strong></p>
+            <div style="padding:10px;border:1px solid #ddd;border-radius:6px;background:#fafafa;">
+              ${comment.replace(/\n/g, "<br/>")}
             </div>
-          `,
-        });
-      } catch (emailError) {
-        console.error("REJECT EMAIL FAILED", emailError);
-      }
+
+            <p style="margin-top:16px;">
+              Please create a <strong>new revision</strong>, update the report accordingly, and submit it again for approval.
+            </p>
+
+            <p>
+              <a href="${reportLink}" style="display:inline-block;padding:10px 16px;background:#1d4ed8;color:#fff;text-decoration:none;border-radius:6px">
+                Open Report
+              </a>
+            </p>
+
+            <p>Best regards,<br/>iFlowX System</p>
+          </div>
+        `,
+      });
     }
 
-    return NextResponse.redirect(
-      new URL(`/gen/esg/ghg_inv/approve?token=${token}`, req.url)
-    );
+    return NextResponse.redirect(approvalPageUrl);
   } catch (e) {
     console.error("REJECT ROUTE FAILED", e);
     return NextResponse.json(

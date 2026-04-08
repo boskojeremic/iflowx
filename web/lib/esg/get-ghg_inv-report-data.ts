@@ -22,6 +22,7 @@ export type Ghg_InvPreviewData = {
     approvedBy: string;
     comment: string;
     status: string;
+    siteName: string;
   };
   sections: {
     manual: Ghg_InvPreviewRow[];
@@ -31,8 +32,11 @@ export type Ghg_InvPreviewData = {
   };
 };
 
-function toDateOnly(value: string) {
-  return new Date(`${value}T00:00:00`);
+function getDayRange(value: string) {
+  return {
+    gte: new Date(`${value}T00:00:00.000Z`),
+    lte: new Date(`${value}T23:59:59.999Z`),
+  };
 }
 
 function pickValue(detail: {
@@ -57,8 +61,9 @@ export async function getGhgInvReportData(params: {
   reportCode: string;
   reportDate: string;
   revisionNo?: number;
+  snapshotId?: string;
 }): Promise<Ghg_InvPreviewData | null> {
-  const { tenantId, reportCode, reportDate, revisionNo } = params;
+  const { tenantId, reportCode, reportDate, revisionNo, snapshotId } = params;
 
   const report = await db.reportDefinition.findFirst({
     where: {
@@ -75,54 +80,100 @@ export async function getGhgInvReportData(params: {
 
   if (!report) return null;
 
-  const snapshot = await db.measurementSnapshot.findFirst({
+  const site = await db.site.findFirst({
     where: {
       tenantId,
-      reportId: report.id,
-      snapshotDate: toDateOnly(reportDate),
-      ...(revisionNo !== undefined && revisionNo !== null
-  ? { snapshotRevisionNo: revisionNo }
-  : {}),
+      isActive: true,
     },
-    orderBy:
-  revisionNo !== undefined && revisionNo !== null
-    ? undefined
-    : [{ snapshotRevisionNo: "desc" }],
-    include: {
-      details: {
-        include: {
-          measurementPoint: {
-            include: {
-              measurementUnit: true,
-              mpSource: true,
-            },
-          },
-        },
-      },
-      responsibleUser: {
-        select: {
-          name: true,
-          firstName: true,
-          lastName: true,
-        },
-      },
-      approverUser: {
-        select: {
-          name: true,
-          firstName: true,
-          lastName: true,
-        },
-      },
+    orderBy: {
+      createdAt: "asc",
+    },
+    select: {
+      name: true,
     },
   });
 
-  const currentDayStatus = await db.reportDayStatus.findUnique({
+  const snapshot =
+    snapshotId
+      ? await db.measurementSnapshot.findFirst({
+          where: {
+            id: snapshotId,
+            tenantId,
+            reportId: report.id,
+          },
+          include: {
+            details: {
+              include: {
+                measurementPoint: {
+                  include: {
+                    measurementUnit: true,
+                    mpSource: true,
+                  },
+                },
+              },
+            },
+            responsibleUser: {
+              select: {
+                name: true,
+                firstName: true,
+                lastName: true,
+              },
+            },
+            approverUser: {
+              select: {
+                name: true,
+                firstName: true,
+                lastName: true,
+              },
+            },
+          },
+        })
+      : await db.measurementSnapshot.findFirst({
+          where: {
+            tenantId,
+            reportId: report.id,
+            snapshotDate: getDayRange(reportDate),
+            ...(revisionNo !== undefined && revisionNo !== null
+              ? { snapshotRevisionNo: revisionNo }
+              : {}),
+          },
+          orderBy:
+            revisionNo !== undefined && revisionNo !== null
+              ? undefined
+              : [{ snapshotRevisionNo: "desc" }],
+          include: {
+            details: {
+              include: {
+                measurementPoint: {
+                  include: {
+                    measurementUnit: true,
+                    mpSource: true,
+                  },
+                },
+              },
+            },
+            responsibleUser: {
+              select: {
+                name: true,
+                firstName: true,
+                lastName: true,
+              },
+            },
+            approverUser: {
+              select: {
+                name: true,
+                firstName: true,
+                lastName: true,
+              },
+            },
+          },
+        });
+
+  const currentDayStatus = await db.reportDayStatus.findFirst({
     where: {
-      tenantId_reportId_day: {
-        tenantId,
-        reportId: report.id,
-        day: toDateOnly(reportDate),
-      },
+      tenantId,
+      reportId: report.id,
+      day: getDayRange(reportDate),
     },
     select: {
       status: true,
@@ -133,7 +184,7 @@ export async function getGhgInvReportData(params: {
     where: {
       tenantId,
       reportId: report.id,
-      day: toDateOnly(reportDate),
+      day: getDayRange(reportDate),
     },
     orderBy: [{ createdAt: "desc" }],
     select: {
@@ -144,16 +195,15 @@ export async function getGhgInvReportData(params: {
     },
   });
 
-  const latestApprovalActor =
-    latestApprovalAction?.approverUserId
-      ? await db.user.findUnique({
-          where: { id: latestApprovalAction.approverUserId },
-          select: {
-            name: true,
-            email: true,
-          },
-        })
-      : null;
+  const latestApprovalActor = latestApprovalAction?.approverUserId
+    ? await db.user.findUnique({
+        where: { id: latestApprovalAction.approverUserId },
+        select: {
+          name: true,
+          email: true,
+        },
+      })
+    : null;
 
   const approvalActorName =
     latestApprovalActor?.name?.trim() ||
@@ -182,6 +232,7 @@ export async function getGhgInvReportData(params: {
         approvedBy: "",
         comment: latestApprovalAction?.rejectComment ?? "",
         status: displayStatus,
+        siteName: site?.name ?? "",
       },
       sections: {
         manual: [],
@@ -209,7 +260,9 @@ export async function getGhgInvReportData(params: {
   const rows: Ghg_InvPreviewRow[] = snapshot.details
     .map((d) => {
       const mp = d.measurementPoint;
-      const source = mp.mpSource?.sourceName ?? "UNDEFINED";
+      const source = String(mp.mpSource?.sourceName ?? "UNDEFINED")
+        .trim()
+        .toUpperCase();
 
       let value = pickValue(d);
 
@@ -241,6 +294,7 @@ export async function getGhgInvReportData(params: {
       approvedBy,
       comment: latestApprovalAction?.rejectComment ?? snapshot.snapComment ?? "",
       status: displayStatus,
+      siteName: site?.name ?? "",
     },
     sections: {
       manual: rows.filter((r) => r.source === "MANUAL"),

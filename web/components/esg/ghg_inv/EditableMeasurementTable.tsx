@@ -51,7 +51,7 @@ export default function EditableMeasurementTable({ rows }: Props) {
       const params = new URLSearchParams(searchParams?.toString() ?? "");
       params.set("_ts", Date.now().toString());
 
-      router.replace(`/esg/ghg_inv?${params.toString()}`);
+      router.replace(`/gen/esg/ghg_inv?${params.toString()}`);
       router.refresh();
     } catch (error) {
       console.error(error);

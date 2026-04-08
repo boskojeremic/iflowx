@@ -7,21 +7,30 @@ export async function middleware(req: any) {
   const pdfMode = req.nextUrl.searchParams.get("pdf");
   const pdfKey = req.nextUrl.searchParams.get("key");
 
-  const isInternalPdfPreview =
+  const isInternalFopPdfPreview =
     pathname.startsWith("/pdf/fop-preview") &&
     pdfMode === "1" &&
     pdfKey &&
     pdfKey === process.env.PDF_INTERNAL_SECRET;
 
-  // public / technical routes
+  const isInternalGhgPdfPreview =
+    pathname.startsWith("/ghg_inv-preview") &&
+    pdfMode === "1" &&
+    pdfKey &&
+    pdfKey === process.env.PDF_INTERNAL_SECRET;
+
   if (
-    isInternalPdfPreview ||
+    isInternalFopPdfPreview ||
+    isInternalGhgPdfPreview ||
     pathname.startsWith("/login") ||
     pathname.startsWith("/invite") ||
     pathname.startsWith("/api/auth") ||
     pathname.startsWith("/api/fop") ||
+    pathname.startsWith("/api/esg/ghg_inv") ||
     pathname.startsWith("/ogi/fop/approve") ||
+    pathname.startsWith("/gen/esg/ghg_inv/approve") ||
     pathname.startsWith("/fop-preview") ||
+    pathname.startsWith("/ghg_inv-preview") ||
     pathname.startsWith("/pdf/fop-preview") ||
     pathname.startsWith("/test-pdf") ||
     pathname.startsWith("/_next") ||

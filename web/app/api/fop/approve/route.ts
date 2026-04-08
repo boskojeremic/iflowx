@@ -76,7 +76,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid token." }, { status: 404 });
     }
 
-    const approvalPageUrl = new URL(`/ogi/fop/approve?token=${token}`, getAppUrl());
+    const approvalPageUrl = new URL(
+      `/gen/esg/ghg_inv/approve?token=${token}`,
+      getAppUrl()
+    );
 
     if (approval.status !== "PENDING") {
       return NextResponse.redirect(approvalPageUrl);
@@ -144,7 +147,7 @@ export async function POST(req: NextRequest) {
       const appUrl = getAppUrl();
 
       const reportLink =
-        `${appUrl}/ogi/fop?report=${approval.reportCode}` +
+        `${appUrl}/gen/esg/ghg_inv?report=${approval.reportCode}` +
         `&date=${formatYmdLocal(approval.day)}` +
         `&rev=${approval.revisionNo}`;
 

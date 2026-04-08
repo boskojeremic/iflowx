@@ -1,4 +1,4 @@
-export type GHG_InvReportCode = "GHG_INV";
+export type GhgInvReportCode = "GHG_INV";
 
 export type GhgInvKpiCard = {
   key: string;
@@ -14,7 +14,7 @@ export type GhgInvSection = {
 };
 
 export type GhgInvReportMeta = {
-  code: GHG_InvReportCode;
+  code: GhgInvReportCode;
   title: string;
   shortTitle: string;
   docNo: string;
@@ -55,7 +55,7 @@ const defaultKpis: GhgInvKpiCard[] = [
 ];
 
 function makeMeta(
-  code: GHG_InvReportCode,
+  code: GhgInvReportCode,
   title: string,
   docNo: string,
   sections: GhgInvSection[],
@@ -79,10 +79,7 @@ function makeMeta(
   };
 }
 
-export const GHG_Inv_REPORT_META: Record<
-  GHG_InvReportCode,
-  GhgInvReportMeta
-> = {
+export const GHG_INV_REPORT_META: Record<GhgInvReportCode, GhgInvReportMeta> = {
   GHG_INV: makeMeta(
     "GHG_INV",
     "GHG EMISSIONS INVENTORY",

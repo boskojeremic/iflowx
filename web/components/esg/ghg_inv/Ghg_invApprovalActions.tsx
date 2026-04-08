@@ -7,7 +7,7 @@ type Props = {
   isPending: boolean;
 };
 
-export default function FopApprovalActions({ token, isPending }: Props) {
+export default function GhgInvApprovalActions({ token, isPending }: Props) {
   const [showReject, setShowReject] = useState(false);
 
   if (!isPending) {

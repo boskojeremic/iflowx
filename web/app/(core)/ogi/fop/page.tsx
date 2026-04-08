@@ -93,10 +93,33 @@ function displayValue(
   intVal: number | null,
   textVal: string | null
 ) {
-  if (floatVal !== null && floatVal !== undefined) return String(floatVal);
-  if (intVal !== null && intVal !== undefined) return String(intVal);
-  if (textVal !== null && textVal !== undefined) return textVal;
-  return "";
+  let value: number | string | null = null;
+
+  if (floatVal !== null && floatVal !== undefined) value = floatVal;
+  else if (intVal !== null && intVal !== undefined) value = intVal;
+  else if (textVal !== null && textVal !== undefined) value = textVal;
+
+  if (value === null || value === "") return "";
+
+  const num =
+    typeof value === "number"
+      ? value
+      : Number(String(value).replace(",", "."));
+
+  if (Number.isNaN(num)) return String(value);
+
+  if (num === 0) return "0.00";
+
+  const abs = Math.abs(num);
+
+  if (abs < 0.01) {
+    return num.toExponential(2).replace("e", "E");
+  }
+
+  return num.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 }
 
 function formatDateTime(value: Date | null | undefined) {

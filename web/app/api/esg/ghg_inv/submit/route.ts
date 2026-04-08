@@ -5,7 +5,21 @@ import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
 
 function toDateOnly(value: string) {
-  return new Date(`${value}T00:00:00`);
+  const [year, month, day] = value.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+}
+
+function getAppUrl() {
+  const appUrl =
+    process.env.APP_URL ||
+    process.env.NEXT_PUBLIC_APP_URL ||
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "");
+
+  if (!appUrl) {
+    throw new Error("APP_URL is not configured.");
+  }
+
+  return appUrl.replace(/\/+$/, "");
 }
 
 async function sendEmailViaResend(params: {
@@ -14,12 +28,10 @@ async function sendEmailViaResend(params: {
   html: string;
 }) {
   const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.EMAIL_FROM || "iFlowX <no-reply@example.com>";
+  const from = process.env.EMAIL_FROM;
 
-  if (!apiKey) {
-    console.warn("RESEND_API_KEY is missing. Email was not sent.");
-    return;
-  }
+  if (!apiKey) throw new Error("RESEND_API_KEY missing");
+  if (!from) throw new Error("EMAIL_FROM missing");
 
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
@@ -37,28 +49,27 @@ async function sendEmailViaResend(params: {
 
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`Resend error: ${text}`);
+    throw new Error(text);
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-
     const formData = await req.formData();
 
-    const tenantId = String(formData.get("tenantId") ?? "");
-    const reportId = String(formData.get("reportId") ?? "");
-    const reportCode = String(formData.get("reportCode") ?? "");
-    const reportName = String(formData.get("reportName") ?? "");
-    const date = String(formData.get("date") ?? "");
+    const tenantId = String(formData.get("tenantId") ?? "").trim();
+    const reportId = String(formData.get("reportId") ?? "").trim();
+    const reportCode = String(formData.get("reportCode") ?? "").trim();
+    const reportName = String(formData.get("reportName") ?? "").trim();
+    const date = String(formData.get("date") ?? "").trim();
     const revisionNo = Number(formData.get("revisionNo") ?? 0);
-    const snapshotId = String(formData.get("snapshotId") ?? "");
-    const documentNumber = String(formData.get("documentNumber") ?? "");
-    const approverUserId = String(formData.get("approverUserId") ?? "");
+    const snapshotId = String(formData.get("snapshotId") ?? "").trim();
+    const documentNumber = String(formData.get("documentNumber") ?? "").trim();
+    const approverUserId = String(formData.get("approverUserId") ?? "").trim();
     const returnTo = String(
       formData.get("returnTo") ?? "/gen/esg/ghg_inv"
-    );
+    ).trim();
 
     if (
       !tenantId ||
@@ -78,46 +89,28 @@ export async function POST(req: NextRequest) {
     const snapshot = await db.measurementSnapshot.findUnique({
       where: { id: snapshotId },
       select: {
-        id: true,
         snapshotRevisionNo: true,
         documentNumber: true,
       },
     });
 
-    if (!snapshot) {
-      return NextResponse.json(
-        { error: "Snapshot not found. Insert first." },
-        { status: 400 }
-      );
-    }
+    if (!snapshot) throw new Error("Snapshot not found");
 
     const approver = await db.user.findUnique({
       where: { id: approverUserId },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-      },
+      select: { email: true, name: true },
     });
 
-    if (!approver?.email) {
-      return NextResponse.json(
-        { error: "Approver email not found." },
-        { status: 400 }
-      );
-    }
+    if (!approver?.email) throw new Error("Approver email missing");
 
     const requester = session?.user?.email
       ? await db.user.findUnique({
           where: { email: session.user.email },
-          select: {
-            id: true,
-            email: true,
-            name: true,
-          },
+          select: { id: true, email: true, name: true },
         })
       : null;
 
+    // STATUS
     await db.reportDayStatus.upsert({
       where: {
         tenantId_reportId_day: {
@@ -129,6 +122,7 @@ export async function POST(req: NextRequest) {
       update: {
         status: "SUBMITTED",
         submittedAt: new Date(),
+        approvedAt: null,
       },
       create: {
         id: crypto.randomUUID(),
@@ -140,6 +134,7 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    // TOKEN
     const token = crypto.randomUUID();
 
     await db.reportApprovalToken.create({
@@ -150,7 +145,7 @@ export async function POST(req: NextRequest) {
         reportCode,
         reportName,
         snapshotId,
-        revisionNo: snapshot.snapshotRevisionNo ?? revisionNo ?? 0,
+        revisionNo: snapshot.snapshotRevisionNo ?? revisionNo,
         documentNumber: snapshot.documentNumber ?? documentNumber ?? null,
         day: toDateOnly(date),
         approverUserId,
@@ -159,44 +154,39 @@ export async function POST(req: NextRequest) {
         requesterEmail: requester?.email ?? null,
         requesterName: requester?.name ?? null,
         status: "PENDING",
-        expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24),
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
       },
     });
 
-    const appUrl =
-      process.env.APP_URL ||
-      process.env.NEXT_PUBLIC_APP_URL ||
-      "http://localhost:3001";
-
+    // LINK
+    const appUrl = getAppUrl();
     const approveLink = `${appUrl}/gen/esg/ghg_inv/approve?token=${token}`;
 
     await sendEmailViaResend({
       to: approver.email,
       subject: `Approval required: ${reportName} / ${date}`,
       html: `
-        <div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.5">
-          <p>Dear ${approver.name || "Approver"},</p>
-          <p>A report requires your approval.</p>
-          <p><strong>Report:</strong> ${reportName}<br/>
-          <strong>Date:</strong> ${date}<br/>
-          <strong>Revision:</strong> ${snapshot.snapshotRevisionNo ?? revisionNo ?? 0}<br/>
-          <strong>Document No:</strong> ${snapshot.documentNumber ?? "-"}</p>
-          <p>
-            <a href="${approveLink}" style="display:inline-block;padding:10px 16px;background:#1d4ed8;color:#fff;text-decoration:none;border-radius:6px">
-              Open Approval Page
-            </a>
-          </p>
-          <p>Or open directly:<br/>${approveLink}</p>
-          <p>Best regards,<br/>iFlowX System</p>
-        </div>
+        <p>Report requires approval</p>
+        <p><strong>${reportName}</strong></p>
+        <p>Date: ${date}</p>
+        <p>Revision: ${snapshot.snapshotRevisionNo ?? revisionNo}</p>
+        <p>Document: ${snapshot.documentNumber ?? "-"}</p>
+        <p><a href="${approveLink}">Open Approval</a></p>
       `,
     });
 
-    return NextResponse.redirect(new URL(returnTo, req.url));
+    return NextResponse.redirect(
+      new URL(returnTo.startsWith("/") ? returnTo : "/gen/esg/ghg_inv", appUrl)
+    );
+
   } catch (e) {
-    console.error(e);
+    console.error("SUBMIT FAILED:", e);
+
     return NextResponse.json(
-      { error: "Submit failed." },
+      {
+        error: "Submit failed",
+        details: e instanceof Error ? e.message : String(e),
+      },
       { status: 500 }
     );
   }

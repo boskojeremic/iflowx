@@ -14,8 +14,25 @@ function formatDisplayDate(value: string) {
 }
 
 function formatValue(value: string | number | null) {
-  if (value === null || value === undefined || value === "") return "0";
-  return String(value);
+  if (value === null || value === undefined || value === "") return "0.00";
+
+  const num =
+    typeof value === "number" ? value : Number(String(value).replace(",", "."));
+
+  if (Number.isNaN(num)) return String(value);
+
+  if (num === 0) return "0.00";
+
+  const abs = Math.abs(num);
+
+  if (abs < 0.01) {
+    return num.toExponential(2).replace("e", "E");
+  }
+
+  return num.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 }
 
 function SectionTable({

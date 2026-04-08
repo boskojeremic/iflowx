@@ -34,7 +34,7 @@ export default function ReportFilterSelect({
     params.set("date", selectedDate);
     params.set("report", nextReportCode);
 
-    router.replace(`/esg/ghg_inv?${params.toString()}`);
+    router.replace(`/gen/esg/ghg_inv?${params.toString()}`);
   }
 
   return (

@@ -14,8 +14,25 @@ function formatDisplayDate(value: string) {
 }
 
 function formatValue(value: string | number | null) {
-  if (value === null || value === undefined || value === "") return "0";
-  return String(value);
+  if (value === null || value === undefined || value === "") return "0.00";
+
+  const num =
+    typeof value === "number" ? value : Number(String(value).replace(",", "."));
+
+  if (Number.isNaN(num)) return String(value);
+
+  if (num === 0) return "0.00";
+
+  const abs = Math.abs(num);
+
+  if (abs < 0.01) {
+    return num.toExponential(2).replace("e", "E");
+  }
+
+  return num.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 }
 
 function SectionTable({
@@ -35,7 +52,7 @@ function SectionTable({
   }>;
 }) {
   return (
-    <div className="mt-4 border border-slate-300">
+    <div className="mt-4 border border-slate-300 break-inside-avoid">
       <div className="border-b border-slate-300 bg-slate-100 px-4 py-3 text-[13px] font-bold text-slate-800">
         {title}
       </div>
@@ -71,22 +88,22 @@ function SectionTable({
                 key={`${title}-${row.tag}-${idx}`}
                 className="border-t border-slate-300"
               >
-                <td className="border-r border-slate-300 px-3 py-3">
+                <td className="border-r border-slate-300 px-3 py-3 align-top">
                   {row.tag}
                 </td>
-                <td className="border-r border-slate-300 px-3 py-3">
+                <td className="border-r border-slate-300 px-3 py-3 align-top">
                   {row.description}
                 </td>
-                <td className="border-r border-slate-300 px-3 py-3">
+                <td className="border-r border-slate-300 px-3 py-3 align-top">
                   {formatValue(row.value)}
                 </td>
-                <td className="border-r border-slate-300 px-3 py-3">
+                <td className="border-r border-slate-300 px-3 py-3 align-top">
                   {row.unit}
                 </td>
-                <td className="border-r border-slate-300 px-3 py-3">
+                <td className="border-r border-slate-300 px-3 py-3 align-top">
                   {row.source}
                 </td>
-                <td className="px-3 py-3">{row.comment}</td>
+                <td className="px-3 py-3 align-top">{row.comment}</td>
               </tr>
             ))
           ) : (
@@ -105,7 +122,7 @@ function SectionTable({
   );
 }
 
-export default function FopReportTemplate({
+export default function GhgInvReportTemplate({
   report,
   reportDate,
   data,
@@ -116,63 +133,81 @@ export default function FopReportTemplate({
   return (
     <div
       id="pdf-report"
-      className="mx-auto w-full max-w-[1180px] bg-white px-6 py-5 text-slate-900"
+      style={{
+        width: "100%",
+        margin: 0,
+        padding: 0,
+        background: "#ffffff",
+        boxSizing: "border-box",
+        minHeight: "100vh",
+      }}
+      className="text-slate-900"
     >
-      <div className="rounded-[14px] bg-[#08164d] px-6 py-5 text-white">
-        <div className="grid grid-cols-[1fr_auto] items-start gap-4">
-          <div>
-            <div className="text-[11px] font-semibold uppercase tracking-wide text-white/85">
-              FIELD OPERATIONS
+      <div
+        style={{
+          width: "100%",
+          maxWidth: "1180px",
+          margin: "0 auto",
+          padding: "12mm 10mm 14mm 10mm",
+          background: "#ffffff",
+          boxSizing: "border-box",
+        }}
+      >
+        <div className="rounded-[14px] bg-[#08164d] px-6 py-5 text-white">
+          <div className="grid grid-cols-[1fr_auto] items-start gap-4">
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-white/85">
+                ESG REPORTING
+              </div>
+              <div className="mt-1 text-[11px] uppercase text-white/75">
+                {data.header.siteName || ""}
+              </div>
             </div>
-            <div className="mt-1 text-[11px] uppercase text-white/75">
-              CHINAREVSKOYE OIL FIELD
+
+            <div className="text-right text-[11px] text-white/85">
+              <div>{displayDate}</div>
+              <div className="mt-1 font-semibold">Status: {data.header.status}</div>
             </div>
           </div>
 
-          <div className="text-right text-[11px] text-white/85">
-            <div>{displayDate}</div>
-            <div className="mt-1 font-semibold">Status: {data.header.status}</div>
+          <div className="mt-3 text-center text-[28px] font-bold leading-tight">
+            {reportTitle}
           </div>
         </div>
 
-        <div className="mt-3 text-center text-[28px] font-bold leading-tight">
-          {reportTitle}
+        <div className="grid grid-cols-[2.1fr_1fr_2.2fr] border-x border-b border-slate-300 bg-slate-100 text-[11px] text-slate-700">
+          <div className="border-r border-slate-300 px-3 py-2">
+            Doc No: {data.header.documentNumber}
+          </div>
+          <div className="border-r border-slate-300 px-3 py-2">
+            Revision: {data.header.revision}
+          </div>
+          <div className="px-3 py-2">
+            Prepared by: {data.header.preparedBy || "iFlowX System"}
+          </div>
         </div>
-      </div>
 
-      <div className="grid grid-cols-[2.1fr_1fr_2.2fr_0.8fr] border-x border-b border-slate-300 bg-slate-100 text-[11px] text-slate-700">
-        <div className="border-r border-slate-300 px-3 py-2">
-          Doc No: {data.header.documentNumber}
+        <SectionTable
+          title="MANUAL DATA ENTRY"
+          subtitle="Manual values for the selected report date."
+          rows={data.sections.manual}
+        />
+
+        <SectionTable
+          title="SCADA READING"
+          subtitle="SCADA values loaded automatically."
+          rows={data.sections.scada}
+        />
+
+        <SectionTable
+          title="CALCULATED"
+          subtitle="Calculated values generated by engine."
+          rows={data.sections.calculated}
+        />
+
+        <div className="mt-3 text-right text-[10px] text-slate-500">
+          Report Date: {displayDate}
         </div>
-        <div className="border-r border-slate-300 px-3 py-2">
-          Revision: {data.header.revision}
-        </div>
-        <div className="border-r border-slate-300 px-3 py-2">
-          Prepared by: {data.header.preparedBy || "Operations Reporting System"}
-        </div>
-        <div className="px-3 py-2 text-right">Page: 1</div>
-      </div>
-
-      <SectionTable
-        title="MANUAL DATA ENTRY"
-        subtitle="Manual values for the selected report date."
-        rows={data.sections.manual}
-      />
-
-      <SectionTable
-        title="SCADA READING"
-        subtitle="SCADA values loaded automatically for the selected report date."
-        rows={data.sections.scada}
-      />
-
-      <SectionTable
-        title="CALCULATED"
-        subtitle="Calculated values generated by the calculation engine."
-        rows={data.sections.calculated}
-      />
-
-      <div className="mt-3 text-right text-[10px] text-slate-500">
-        Report Date: {displayDate}
       </div>
     </div>
   );

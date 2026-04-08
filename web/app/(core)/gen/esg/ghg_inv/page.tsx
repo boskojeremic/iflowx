@@ -33,16 +33,51 @@ type SearchParams = Promise<{
   cpTag?: string;
 }>;
 
-function todayYmd() {
+function formatNumericValue(value: string | number | null | undefined) {
+  if (value === null || value === undefined || value === "") return "";
+
+  const num =
+    typeof value === "number" ? value : Number(String(value).replace(",", "."));
+
+  if (Number.isNaN(num)) return String(value);
+
+  if (num === 0) return "0.00";
+
+  const abs = Math.abs(num);
+
+  if (abs < 0.01) {
+    return num.toExponential(2).replace("e", "E");
+  }
+
+  return num.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+function yesterdayYmd() {
   const d = new Date();
+  d.setDate(d.getDate() - 1);
+
   const yyyy = d.getFullYear();
   const mm = String(d.getMonth() + 1).padStart(2, "0");
   const dd = String(d.getDate()).padStart(2, "0");
+
   return `${yyyy}-${mm}-${dd}`;
 }
 
-function toDateOnly(value: string) {
-  return new Date(`${value}T00:00:00`);
+function parseYmd(value: string) {
+  const [year, month, day] = String(value).split("-").map(Number);
+  return { year, month, day };
+}
+
+function getDayRange(value: string) {
+  const { year, month, day } = parseYmd(value);
+
+  return {
+    gte: new Date(Date.UTC(year, month - 1, day, 0, 0, 0)),
+    lte: new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999)),
+  };
 }
 
 function ymd(value: Date | string) {
@@ -51,17 +86,6 @@ function ymd(value: Date | string) {
   const mm = String(d.getMonth() + 1).padStart(2, "0");
   const dd = String(d.getDate()).padStart(2, "0");
   return `${yyyy}-${mm}-${dd}`;
-}
-
-function displayValue(
-  floatVal: number | null,
-  intVal: number | null,
-  textVal: string | null
-) {
-  if (floatVal !== null && floatVal !== undefined) return String(floatVal);
-  if (intVal !== null && intVal !== undefined) return String(intVal);
-  if (textVal !== null && textVal !== undefined) return textVal;
-  return "";
 }
 
 function formatDateTime(value: Date | null | undefined) {
@@ -96,30 +120,6 @@ type ChartPoint = {
   documentNumber: string;
 };
 
-async function getCurrentTenantContext(email: string) {
-  const membership = await db.membership.findFirst({
-    where: {
-      user: { email },
-      status: "ACTIVE",
-    },
-    select: {
-      tenantId: true,
-      tenant: {
-        select: {
-          id: true,
-          name: true,
-          code: true,
-        },
-      },
-    },
-    orderBy: {
-      createdAt: "desc",
-    },
-  });
-
-  return membership ?? null;
-}
-
 export default async function GHGInventoryPage({
   searchParams,
 }: {
@@ -133,7 +133,7 @@ export default async function GHGInventoryPage({
   const previewTs = String(sp?._ts ?? "");
   const mainTab = String(sp?.tab ?? "data-entry").toLowerCase();
   const rightTab = String(sp?.rightTab ?? "report").toLowerCase();
-  const selectedDate = String(sp?.date ?? todayYmd());
+  const selectedDate = String(sp?.date ?? yesterdayYmd());
   const selectedRevisionParam = sp?.rev;
 
   const historyQuery = String(sp?.hq ?? "").trim();
@@ -284,7 +284,7 @@ export default async function GHGInventoryPage({
   const approvedReportsRaw = await db.reportDayStatus.findMany({
     where: {
       tenantId: tenant.id,
-      day: toDateOnly(selectedDate),
+      day: getDayRange(selectedDate),
       status: "APPROVED",
       reportDefinition: {
         tenantId: tenant.id,
@@ -337,7 +337,7 @@ export default async function GHGInventoryPage({
           where: {
             tenantId: tenant.id,
             reportId: activeDataEntryReport.id,
-            snapshotDate: toDateOnly(selectedDate),
+            snapshotDate: getDayRange(selectedDate),
           },
           orderBy: [{ snapshotRevisionNo: "desc" }],
           select: {
@@ -354,7 +354,7 @@ export default async function GHGInventoryPage({
           where: {
             tenantId: tenant.id,
             reportId: activeDataEntryReport.id,
-            snapshotDate: toDateOnly(selectedDate),
+            snapshotDate: getDayRange(selectedDate),
             ...(selectedRevision !== null
               ? { snapshotRevisionNo: selectedRevision }
               : {}),
@@ -380,13 +380,11 @@ export default async function GHGInventoryPage({
 
   const currentDayStatus =
     activeDataEntryReport
-      ? await db.reportDayStatus.findUnique({
+      ? await db.reportDayStatus.findFirst({
           where: {
-            tenantId_reportId_day: {
-              tenantId: tenant.id,
-              reportId: activeDataEntryReport.id,
-              day: toDateOnly(selectedDate),
-            },
+            tenantId: tenant.id,
+            reportId: activeDataEntryReport.id,
+            day: getDayRange(selectedDate),
           },
           select: {
             status: true,
@@ -400,7 +398,7 @@ export default async function GHGInventoryPage({
           where: {
             tenantId: tenant.id,
             reportId: activeDataEntryReport.id,
-            day: toDateOnly(selectedDate),
+            day: getDayRange(selectedDate),
           },
           orderBy: [{ createdAt: "desc" }],
           select: {
@@ -528,7 +526,9 @@ export default async function GHGInventoryPage({
           measurementPointId: d.measurementPointId,
           tagNo: d.measurementPoint.tagNo,
           description: d.measurementPoint.descEn ?? d.measurementPoint.tagNo ?? "",
-          value: displayValue(d.mpValueFloat, d.mpValueInt, d.mpValueText),
+          value: formatNumericValue(
+            d.mpValueFloat ?? d.mpValueInt ?? d.mpValueText
+          ),
           unit: d.measurementPoint.measurementUnit?.unitTitle ?? "",
           editable: true,
           sourceName: d.measurementPoint.mpSource?.sourceName ?? "MANUAL",
@@ -543,7 +543,9 @@ export default async function GHGInventoryPage({
           measurementPointId: d.measurementPointId,
           tagNo: d.measurementPoint.tagNo,
           description: d.measurementPoint.descEn ?? d.measurementPoint.tagNo ?? "",
-          value: displayValue(d.mpValueFloat, d.mpValueInt, d.mpValueText),
+          value: formatNumericValue(
+            d.mpValueFloat ?? d.mpValueInt ?? d.mpValueText
+          ),
           unit: d.measurementPoint.measurementUnit?.unitTitle ?? "",
           editable: false,
           sourceName: d.measurementPoint.mpSource?.sourceName ?? "SCADA",
@@ -558,7 +560,9 @@ export default async function GHGInventoryPage({
           measurementPointId: d.measurementPointId,
           tagNo: d.measurementPoint.tagNo,
           description: d.measurementPoint.descEn ?? d.measurementPoint.tagNo ?? "",
-          value: displayValue(d.mpValueFloat, d.mpValueInt, d.mpValueText),
+          value: formatNumericValue(
+            d.mpValueFloat ?? d.mpValueInt ?? d.mpValueText
+          ),
           unit: d.measurementPoint.measurementUnit?.unitTitle ?? "",
           editable: false,
           sourceName: d.measurementPoint.mpSource?.sourceName ?? "CALCULATED",
@@ -586,7 +590,9 @@ export default async function GHGInventoryPage({
     (snapshot?.details ?? []).map((d) => [
       d.measurementPointId,
       {
-        value: displayValue(d.mpValueFloat, d.mpValueInt, d.mpValueText),
+        value: formatNumericValue(
+          d.mpValueFloat ?? d.mpValueInt ?? d.mpValueText
+        ),
         detailId: d.id,
       },
     ])
@@ -659,7 +665,7 @@ export default async function GHGInventoryPage({
             tenantId: tenant.id,
             reportId: activeDataEntryReport.id,
             snapshotDate: {
-              lte: toDateOnly(selectedDate),
+              lte: getDayRange(selectedDate).lte,
             },
           },
           orderBy: [{ snapshotDate: "asc" }, { snapshotRevisionNo: "desc" }],
@@ -702,7 +708,7 @@ export default async function GHGInventoryPage({
             },
             measurementPointId: selectedCheckPointRow.measurementPointId,
             snapshotDate: {
-              lte: toDateOnly(selectedDate),
+              lte: getDayRange(selectedDate).lte,
             },
           },
           include: {
@@ -762,12 +768,16 @@ export default async function GHGInventoryPage({
     "GHG Emissions Inventory";
 
   const activePreviewHtmlSrc = `/ghg_inv-preview/${activePreviewCode}?date=${selectedDate}${
-  previewTs ? `&_ts=${previewTs}` : ""
-}${selectedRevisionValue ? `&rev=${selectedRevisionValue}` : ""}`;
-
-  const activePreviewPdfSrc = `/api/esg/ghg_inv/pdf/${activePreviewCode}_${selectedDate}.pdf${
-    previewTs ? `?ts=${previewTs}` : ""
+    previewTs ? `&_ts=${previewTs}` : ""
+  }${selectedRevisionValue ? `&rev=${selectedRevisionValue}` : ""}${
+    snapshot?.id ? `&snapshotId=${snapshot.id}` : ""
   }`;
+
+  const activePreviewPdfSrc = snapshot?.documentNumber
+  ? `/api/esg/ghg_inv/generate-pdf${
+      previewTs ? `?ts=${previewTs}` : ""
+    }`
+  : "";
 
   const baseQuery = `report=${currentReportCode}&date=${selectedDate}${
     selectedRevisionValue ? `&rev=${selectedRevisionValue}` : ""
@@ -1620,15 +1630,17 @@ export default async function GHGInventoryPage({
                       reportTitle={activePreviewTitle}
                       reportDate={selectedDate}
                       pdfUrl={activePreviewPdfSrc}
+                      documentNumber={snapshot?.documentNumber ?? ""}
+                      revisionNo={snapshot?.snapshotRevisionNo ?? 0}
                     />
                   </div>
 
                   <div className="rounded-xl border border-white/10 bg-black/20 p-3">
                     <GhgInvReportView
-  src={activePreviewHtmlSrc}
-  title={activePreviewTitle}
-  reportDate={selectedDate}
-/>
+                      src={activePreviewHtmlSrc}
+                      title={activePreviewTitle}
+                      reportDate={selectedDate}
+                    />
                   </div>
                 </div>
               )}
@@ -2019,11 +2031,13 @@ function MiniBarChart({
               key={`${p.xLabel}_${idx}`}
               className="flex flex-1 flex-col items-center gap-2"
             >
-              <div className="text-[11px] text-white/55">{p.value}</div>
+              <div className="text-[11px] text-white/55">
+                {formatNumericValue(p.value)}
+              </div>
               <div
                 className="w-full max-w-[56px] rounded-t-md bg-blue-400/70"
                 style={{ height: `${height}px` }}
-                title={`${p.xLabel} / ${p.value}`}
+                title={`${p.xLabel} / ${formatNumericValue(p.value)}`}
               />
               <div className="text-center text-[11px] leading-tight text-white/45">
                 {p.xLabel}
@@ -2118,7 +2132,9 @@ function MiniTrendChart({
             className="rounded-md border border-white/10 bg-white/[0.03] px-3 py-2"
           >
             <div className="text-[11px] text-white/45">{p.xLabel}</div>
-            <div className="text-sm font-semibold text-white/85">{p.value}</div>
+            <div className="text-sm font-semibold text-white/85">
+              {formatNumericValue(p.value)}
+            </div>
           </div>
         ))}
       </div>

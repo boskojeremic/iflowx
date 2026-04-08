@@ -1,8 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import fs from "node:fs/promises";
-import path from "node:path";
 import { Resend } from "resend";
-import { GHG_Inv_PDF_DIR } from "@/lib/ghg_inv-pdf-path";
 
 export const runtime = "nodejs";
 
@@ -19,44 +16,6 @@ function splitEmails(value: string) {
     .filter(Boolean);
 }
 
-async function ensurePdfExists(reportCode: string, reportDate: string) {
-  const fileName = `${reportCode}_${reportDate}.pdf`;
-  const filePath = path.join(GHG_Inv_PDF_DIR, fileName);
-
-  try {
-    await fs.access(filePath);
-    return { fileName, filePath };
-  } catch {
-    const baseUrl =
-      process.env.APP_URL ||
-      process.env.NEXT_PUBLIC_APP_URL ||
-      "http://localhost:3001";
-
-    const generateRes = await fetch(`${baseUrl}/api/esg/ghg_inv/generate-pdf`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        reportCode,
-        reportDate,
-      }),
-      cache: "no-store",
-    });
-
-    const generateData = await generateRes.json().catch(() => null);
-
-    if (!generateRes.ok || !generateData?.ok) {
-      throw new Error(
-        generateData?.error || "Failed to auto-generate PDF before sending email."
-      );
-    }
-
-    await fs.access(filePath);
-    return { fileName, filePath };
-  }
-}
-
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -66,9 +25,11 @@ export async function POST(req: NextRequest) {
     const subject = String(body?.subject || "").trim();
     const message = String(body?.body || "").trim();
 
-    const reportCode = safe(body?.reportCode || "DOR").toUpperCase();
+    const reportCode = safe(body?.reportCode || "GHG_INV").toUpperCase();
     const reportDate = safe(body?.reportDate || "");
     const reportTitle = String(body?.reportTitle || reportCode).trim();
+    const documentNumber = String(body?.documentNumber || "").trim();
+    const revisionNo = Number(body?.revisionNo ?? 0);
 
     if (!to.length) {
       return NextResponse.json(
@@ -84,11 +45,56 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { fileName, filePath } = await ensurePdfExists(reportCode, reportDate);
-    const pdfBuffer = await fs.readFile(filePath);
+    if (!documentNumber) {
+      return NextResponse.json(
+        { ok: false, error: "Document Number is required." },
+        { status: 400 }
+      );
+    }
+
+    if (Number.isNaN(revisionNo)) {
+      return NextResponse.json(
+        { ok: false, error: "Revision Number is invalid." },
+        { status: 400 }
+      );
+    }
+
+    if (!process.env.EMAIL_FROM) {
+      throw new Error("EMAIL_FROM is not configured.");
+    }
+
+    const workerUrl = process.env.PDF_WORKER_URL;
+    const workerSecret = process.env.WORKER_SHARED_SECRET;
+
+    if (!workerUrl || !workerSecret) {
+      throw new Error("PDF_WORKER_URL or WORKER_SHARED_SECRET not configured.");
+    }
+
+    const workerRes = await fetch(`${workerUrl}/generate-ghg-inv-pdf`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-worker-secret": workerSecret,
+      },
+      body: JSON.stringify({
+        reportCode,
+        reportDate,
+        revisionNo,
+        documentNumber,
+      }),
+    });
+
+    if (!workerRes.ok) {
+      const text = await workerRes.text();
+      throw new Error(`PDF worker error: ${text}`);
+    }
+
+    const pdfArrayBuffer = await workerRes.arrayBuffer();
+    const pdfBuffer = Buffer.from(pdfArrayBuffer);
+    const fileName = `${documentNumber}.pdf`;
 
     const sendResult = await resend.emails.send({
-      from: process.env.EMAIL_FROM!,
+      from: process.env.EMAIL_FROM,
       to,
       cc: cc.length ? cc : undefined,
       subject: subject || `${reportTitle} - ${reportDate}`,

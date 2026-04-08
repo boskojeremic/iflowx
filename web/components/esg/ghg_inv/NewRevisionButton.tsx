@@ -46,10 +46,6 @@ export default function NewRevisionButton({
       }
 
       const params = new URLSearchParams(searchParams?.toString() ?? "");
-      params.set("tab", "data-entry");
-      params.set("rightTab", "report");
-      params.set("report", reportCode);
-      params.set("date", reportDate);
       params.set("rev", String(data.revision));
       params.set("_ts", Date.now().toString());
 

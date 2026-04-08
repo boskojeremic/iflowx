@@ -20,6 +20,7 @@ export default function InsertGenerateButton({
 }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
+
   const [loading, setLoading] = useState(false);
 
   async function handleInsert() {
@@ -46,11 +47,6 @@ export default function InsertGenerateButton({
       }
 
       const params = new URLSearchParams(searchParams?.toString() ?? "");
-      params.set("tab", "data-entry");
-      params.set("rightTab", "report");
-      params.set("report", reportCode);
-      params.set("date", reportDate);
-      params.set("rev", String(data.revision ?? 0));
       params.set("_ts", Date.now().toString());
 
       router.replace(`/gen/esg/ghg_inv?${params.toString()}`);
