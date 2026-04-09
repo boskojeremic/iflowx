@@ -196,12 +196,10 @@ export default async function GHGInventoryPage({
 
   const reportGroup = await db.reportGroup.findFirst({
     where: {
-      tenantId: tenant.id,
       moduleId: moduleItem.id,
       isActive: true,
       reportDefinitions: {
         some: {
-          tenantId: tenant.id,
           code: REPORT_CODE,
           isActive: true,
         },
@@ -287,7 +285,6 @@ export default async function GHGInventoryPage({
       day: getDayRange(selectedDate),
       status: "APPROVED",
       reportDefinition: {
-        tenantId: tenant.id,
         reportGroupId: reportGroup.id,
         code: REPORT_CODE,
       },
@@ -787,7 +784,6 @@ export default async function GHGInventoryPage({
     where: {
       tenantId: tenant.id,
       reportDefinition: {
-        tenantId: tenant.id,
         reportGroupId: reportGroup.id,
         code: REPORT_CODE,
       },

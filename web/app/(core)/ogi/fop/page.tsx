@@ -234,7 +234,6 @@ const selectedDate = normalizeYmd(rawSelectedDate || yesterdayYmd());
   const reportGroup = tenant
     ? await db.reportGroup.findFirst({
         where: {
-          tenantId: tenant.id,
           moduleId: moduleItem.id,
           isActive: true,
         },
@@ -325,7 +324,6 @@ const selectedDate = normalizeYmd(rawSelectedDate || yesterdayYmd());
           day: selectedDayRange,
           status: "APPROVED",
           reportDefinition: {
-            tenantId: tenant.id,
             reportGroupId: reportGroup.id,
           },
         },
@@ -834,7 +832,6 @@ const rejectedReportsCount = currentDayStatus?.status === "REJECTED" ? 1 : 0;
         where: {
           tenantId: tenant.id,
           reportDefinition: {
-            tenantId: tenant.id,
             reportGroupId: reportGroup.id,
           },
         },

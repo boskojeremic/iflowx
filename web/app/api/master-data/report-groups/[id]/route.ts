@@ -50,7 +50,6 @@ export async function PATCH(
     const existing = await db.reportGroup.findFirst({
       where: {
         id,
-        tenantId: ctx.tenantId,
       },
       select: {
         id: true,
@@ -75,7 +74,6 @@ export async function PATCH(
 
     const duplicate = await db.reportGroup.findFirst({
       where: {
-        tenantId: ctx.tenantId,
         moduleId: existing.moduleId,
         code,
         NOT: {
@@ -103,7 +101,6 @@ export async function PATCH(
       },
       select: {
         id: true,
-        tenantId: true,
         moduleId: true,
         code: true,
         name: true,
@@ -138,7 +135,6 @@ export async function DELETE(
     const existing = await db.reportGroup.findFirst({
       where: {
         id,
-        tenantId: ctx.tenantId,
       },
       select: {
         id: true,
@@ -151,7 +147,6 @@ export async function DELETE(
 
     const reportsCount = await db.reportDefinition.count({
       where: {
-        tenantId: ctx.tenantId,
         reportGroupId: id,
       },
     });

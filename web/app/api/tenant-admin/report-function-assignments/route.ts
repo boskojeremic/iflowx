@@ -44,9 +44,7 @@ async function getModuleSeatSummary(tenantId: string, moduleId: string) {
   const moduleReportIds = (
     await db.reportDefinition.findMany({
       where: {
-        tenantId,
         ReportGroup: {
-          tenantId,
           moduleId,
         },
         isActive: true,
@@ -170,7 +168,6 @@ export async function GET(req: Request) {
     const reportGroups = moduleId
       ? await db.reportGroup.findMany({
           where: {
-            tenantId,
             moduleId,
             isActive: true,
           },
@@ -187,7 +184,6 @@ export async function GET(req: Request) {
     const reportsRaw = reportGroupId
       ? await db.reportDefinition.findMany({
           where: {
-            tenantId,
             reportGroupId,
             isActive: true,
           },
@@ -318,7 +314,6 @@ export async function POST(req: Request) {
     const report = await db.reportDefinition.findFirst({
       where: {
         id: reportId,
-        tenantId,
         isActive: true,
       },
       select: {
@@ -327,7 +322,6 @@ export async function POST(req: Request) {
         ReportGroup: {
           select: {
             moduleId: true,
-            tenantId: true,
           },
         },
       },
@@ -394,9 +388,7 @@ export async function POST(req: Request) {
     const moduleReportIds = (
       await db.reportDefinition.findMany({
         where: {
-          tenantId,
           ReportGroup: {
-            tenantId,
             moduleId: report.ReportGroup.moduleId,
           },
           isActive: true,

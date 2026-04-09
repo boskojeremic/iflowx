@@ -46,14 +46,12 @@ export async function GET(req: Request) {
 
     const reportGroups = await db.reportGroup.findMany({
       where: {
-        tenantId: ctx.tenantId,
         moduleId,
         isActive: true,
       },
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
       select: {
         id: true,
-        tenantId: true,
         moduleId: true,
         code: true,
         name: true,
@@ -96,7 +94,6 @@ export async function POST(req: Request) {
 
     const exists = await db.reportGroup.findFirst({
       where: {
-        tenantId: ctx.tenantId,
         moduleId,
         code,
       },
@@ -113,7 +110,6 @@ export async function POST(req: Request) {
     const item = await db.reportGroup.create({
       data: {
         id: crypto.randomUUID(),
-        tenantId: ctx.tenantId,
         moduleId,
         code,
         name,
@@ -122,7 +118,6 @@ export async function POST(req: Request) {
       },
       select: {
         id: true,
-        tenantId: true,
         moduleId: true,
         code: true,
         name: true,

@@ -75,28 +75,6 @@ export default function MasterDataAdminPage() {
               Set Up Data Capture Points, Tags, And Measurement Sources
             </div>
           </Link>
-
-          {/* ✅ NOVO */}
-          <Link
-            href="/master-data/report-groups"
-            className="rounded-xl border border-white/10 bg-black/20 p-5 transition hover:bg-white/[0.06]"
-          >
-            <div className="font-semibold">Report Groups</div>
-            <div className="mt-2 text-sm text-white/65">
-              Define Tenant-Level Report Group Structure By Module
-            </div>
-          </Link>
-
-          {/* ✅ NOVO */}
-          <Link
-            href="/master-data/reports"
-            className="rounded-xl border border-white/10 bg-black/20 p-5 transition hover:bg-white/[0.06]"
-          >
-            <div className="font-semibold">Reports</div>
-            <div className="mt-2 text-sm text-white/65">
-              Manage Report Definitions And Reporting Catalog For Tenant
-            </div>
-          </Link>
         </div>
       </div>
 

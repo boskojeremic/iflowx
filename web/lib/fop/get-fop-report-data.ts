@@ -66,7 +66,6 @@ export async function getFopReportData(params: {
 
   const report = await db.reportDefinition.findFirst({
     where: {
-      tenantId,
       code: reportCode,
       isActive: true,
     },

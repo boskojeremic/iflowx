@@ -42,8 +42,6 @@ model Tenant {
   measurementSnapshots      MeasurementSnapshot[]
   scadaMeasurements         ScadaMeasurement[]
 
-  reportGroups            ReportGroup[]
-  reportDefinitions       ReportDefinition[]
   employees               Employee[]
   employeeTrainingRecords EmployeeTrainingRecord[]
   employeeHseRecords      EmployeeHseRecord[]
@@ -966,9 +964,23 @@ model ReportDayStatus {
   @@index([tenantId])
 }
 
+model ReportGroup {
+  id                String             @id
+  moduleId          String
+  code              String
+  name              String
+  sortOrder         Int                @default(100)
+  isActive          Boolean            @default(true)
+
+  Module            Module             @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  reportDefinitions ReportDefinition[]
+
+  @@unique([moduleId, code])
+  @@index([moduleId])
+}
+
 model ReportDefinition {
   id            String  @id
-  tenantId      String
   reportGroupId String
   code          String
   name          String
@@ -976,7 +988,6 @@ model ReportDefinition {
   sortOrder     Int     @default(100)
   isActive      Boolean @default(true)
 
-  tenant                    Tenant                           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   ReportGroup               ReportGroup                      @relation(fields: [reportGroupId], references: [id], onDelete: Cascade)
   formulas                  Formula[]
   reportDayStatuses         ReportDayStatus[]
@@ -989,28 +1000,9 @@ model ReportDefinition {
   reportMeasurementPoints   ReportMeasurementPoint[]
   templateFields            ReportTemplateField[]
 
-  @@unique([tenantId, reportGroupId, code])
-  @@index([tenantId])
-  @@index([tenantId, reportGroupId])
-  @@index([tenantId, code])
-}
-
-model ReportGroup {
-  id        String  @id
-  tenantId  String
-  moduleId  String
-  code      String
-  name      String
-  sortOrder Int     @default(100)
-  isActive  Boolean @default(true)
-
-  tenant            Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  Module            Module             @relation(fields: [moduleId], references: [id], onDelete: Cascade)
-  reportDefinitions ReportDefinition[]
-
-  @@unique([tenantId, moduleId, code])
-  @@index([tenantId])
-  @@index([tenantId, moduleId])
+  @@unique([reportGroupId, code])
+  @@index([reportGroupId])
+  @@index([code])
 }
 
 model ReportMethodology {

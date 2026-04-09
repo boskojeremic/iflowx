@@ -87,7 +87,6 @@ export default async function ReportAssignmentsPage({
   const reportGroups = selectedModuleId
   ? await db.reportGroup.findMany({
       where: {
-        tenantId, // ✅ DODATO
         moduleId: selectedModuleId,
         isActive: true,
       },
@@ -104,7 +103,6 @@ export default async function ReportAssignmentsPage({
 const reports = selectedReportGroupId
   ? await db.reportDefinition.findMany({
       where: {
-        tenantId, // ✅ DODATO
         reportGroupId: selectedReportGroupId,
         isActive: true,
       },

@@ -89,7 +89,6 @@ export default async function WorkforcePreviewPage({
 
   const report = await db.reportDefinition.findFirst({
     where: {
-      tenantId,
       code: reportCode,
       isActive: true,
     },

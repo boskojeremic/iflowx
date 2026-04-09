@@ -123,7 +123,6 @@ export default async function GhgInvPreviewPage({
     if (!reportDate) {
       const reportDefinition = await db.reportDefinition.findFirst({
         where: {
-          tenantId,
           code: reportCode,
           isActive: true,
         },

@@ -56,7 +56,6 @@ export default async function HrReportPage({
 
   const report = await db.reportDefinition.findFirst({
     where: {
-      tenantId,
       code: reportCode.toUpperCase(),
       isActive: true,
     },

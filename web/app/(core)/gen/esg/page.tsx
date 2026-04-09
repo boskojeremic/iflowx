@@ -82,11 +82,9 @@ export default async function ESGHomePage({
 
   const reportsRaw = await db.reportDefinition.findMany({
     where: {
-      tenantId,
-      isActive: true,
+     isActive: true,
       ReportGroup: {
         is: {
-          tenantId,
           moduleId: esgModule.id,
           isActive: true,
         },

@@ -54,7 +54,6 @@ export default async function HrHomePage({
 
   const reportGroups = await db.reportGroup.findMany({
     where: {
-      tenantId,
       moduleId: hrModule.id,
       isActive: true,
     },
@@ -66,7 +65,6 @@ export default async function HrHomePage({
       sortOrder: true,
       reportDefinitions: {
         where: {
-          tenantId,
           isActive: true,
         },
         orderBy: [{ sortOrder: "asc" }, { name: "asc" }],

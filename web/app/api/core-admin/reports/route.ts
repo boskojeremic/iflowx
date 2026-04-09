@@ -27,7 +27,7 @@ export async function POST(req: Request) {
 
   const reportGroup = await db.reportGroup.findUnique({
   where: { id: body.reportGroupId },
-  select: { id: true, tenantId: true },
+  select: { id: true, moduleId: true },
 });
 
 if (!reportGroup) {
@@ -37,7 +37,6 @@ if (!reportGroup) {
 const item = await db.reportDefinition.create({
   data: {
     id: crypto.randomUUID(),
-    tenantId: reportGroup.tenantId,
     reportGroupId: reportGroup.id,
     code: body.code,
     name: body.name,

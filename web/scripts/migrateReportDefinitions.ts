@@ -73,12 +73,10 @@ async function main() {
 
   const reportGroup = await prisma.reportGroup.findFirst({
     where: {
-      tenantId: TENANT_ID,
       code: REPORT_GROUP_CODE,
     },
     select: {
       id: true,
-      tenantId: true,
       code: true,
       name: true,
     },
@@ -108,7 +106,6 @@ async function main() {
 
   const existing = await prisma.reportDefinition.findMany({
     where: {
-      tenantId: reportGroup.tenantId,
       reportGroupId: reportGroup.id,
     },
     select: {
@@ -157,7 +154,6 @@ async function main() {
       const res = await prisma.reportDefinition.create({
         data: {
           id: randomUUID(),
-          tenantId: reportGroup.tenantId,
           reportGroupId: reportGroup.id,
           code,
           name: row.report_name,

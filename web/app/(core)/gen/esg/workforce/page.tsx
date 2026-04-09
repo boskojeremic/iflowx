@@ -182,12 +182,10 @@ export default async function WorkforceReportPage({
 
   const report = await db.reportDefinition.findFirst({
     where: {
-      tenantId,
       code: REPORT_CODE,
       isActive: true,
       ReportGroup: {
         is: {
-          tenantId,
           moduleId: moduleItem.id,
           isActive: true,
         },

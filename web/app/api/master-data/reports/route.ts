@@ -41,14 +41,12 @@ export async function GET(req: Request) {
 
     const reports = await db.reportDefinition.findMany({
       where: {
-        tenantId: ctx.tenantId,
         reportGroupId,
         isActive: true,
       },
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
       select: {
         id: true,
-        tenantId: true,
         reportGroupId: true,
         code: true,
         name: true,
@@ -94,7 +92,6 @@ export async function POST(req: Request) {
     const group = await db.reportGroup.findFirst({
       where: {
         id: reportGroupId,
-        tenantId: ctx.tenantId,
         isActive: true,
       },
       select: {
@@ -111,7 +108,6 @@ export async function POST(req: Request) {
 
     const exists = await db.reportDefinition.findFirst({
       where: {
-        tenantId: ctx.tenantId,
         reportGroupId,
         code,
       },
@@ -128,7 +124,6 @@ export async function POST(req: Request) {
     const item = await db.reportDefinition.create({
       data: {
         id: crypto.randomUUID(),
-        tenantId: ctx.tenantId,
         reportGroupId,
         code,
         name,
@@ -138,7 +133,6 @@ export async function POST(req: Request) {
       },
       select: {
         id: true,
-        tenantId: true,
         reportGroupId: true,
         code: true,
         name: true,

@@ -101,7 +101,6 @@ export async function POST(req: NextRequest) {
     const report = await db.reportDefinition.findFirst({
       where: {
         id: reportId,
-        tenantId,
         code: reportCode,
         isActive: true,
       },

@@ -67,7 +67,6 @@ export async function getGhgInvReportData(params: {
 
   const report = await db.reportDefinition.findFirst({
     where: {
-      tenantId,
       code: reportCode,
       isActive: true,
     },
