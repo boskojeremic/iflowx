@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 export default function InviteClient({ token }: { token: string }) {
   const [email, setEmail] = useState<string>("");
-  const [displayName, setDisplayName] = useState<string>(""); // name from DB (optional)
+  const [displayName, setDisplayName] = useState<string>("");
   const [tenantLabel, setTenantLabel] = useState<string>("");
   const [role, setRole] = useState<string>("");
 
@@ -25,7 +25,11 @@ export default function InviteClient({ token }: { token: string }) {
         const r = await fetch(`/api/invites/verify?token=${encodeURIComponent(token)}`, {
           cache: "no-store",
         });
-        const d = await r.json().catch(() => null);
+
+        const contentType = r.headers.get("content-type") || "";
+        const d = contentType.includes("application/json")
+          ? await r.json().catch(() => null)
+          : null;
 
         if (!alive) return;
 
@@ -36,13 +40,10 @@ export default function InviteClient({ token }: { token: string }) {
         }
 
         setEmail(String(d.email || ""));
-setTenantLabel(`${d.tenant?.name ?? ""} (${d.tenant?.code ?? ""})`);
-setRole(String(d.role || ""));
-setDisplayName(String(d.name || "")); // ✅ SHOW NAME
+        setTenantLabel(`${d.tenant?.name ?? ""} (${d.tenant?.code ?? ""})`);
+        setRole(String(d.role || ""));
+        setDisplayName(String(d.name || ""));
 
-        // OPTIONAL: if your verify endpoint returns name, show it:
-        // setDisplayName(String(d.name || ""));
-        // If not available, you can keep blank or show email as fallback.
         setStatus("ready");
       } catch (e) {
         console.error(e);
@@ -65,6 +66,7 @@ setDisplayName(String(d.name || "")); // ✅ SHOW NAME
         setError("PASSWORD_MIN_8_CHARS");
         return;
       }
+
       if (password !== confirmPassword) {
         setError("PASSWORDS_DO_NOT_MATCH");
         return;
@@ -76,7 +78,10 @@ setDisplayName(String(d.name || "")); // ✅ SHOW NAME
         body: JSON.stringify({ token, password }),
       });
 
-      const d = await r.json().catch(() => null);
+      const contentType = r.headers.get("content-type") || "";
+      const d = contentType.includes("application/json")
+        ? await r.json().catch(() => null)
+        : null;
 
       if (!r.ok || !d?.ok) {
         setError(d?.error || `ACCEPT_FAILED_${r.status}`);
@@ -90,8 +95,13 @@ setDisplayName(String(d.name || "")); // ✅ SHOW NAME
     }
   }
 
-  if (status === "loading") return <div className="p-6 text-white">Loading invite…</div>;
-  if (status === "error") return <div className="p-6 text-white">Invite error: {error}</div>;
+  if (status === "loading") {
+    return <div className="p-6 text-white">Loading invite…</div>;
+  }
+
+  if (status === "error") {
+    return <div className="p-6 text-white">Invite error: {error}</div>;
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center text-white">

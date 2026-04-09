@@ -24,6 +24,7 @@ export async function middleware(req: any) {
     isInternalGhgPdfPreview ||
     pathname.startsWith("/login") ||
     pathname.startsWith("/invite") ||
+    pathname.startsWith("/api/invites") ||
     pathname.startsWith("/api/auth") ||
     pathname.startsWith("/api/fop") ||
     pathname.startsWith("/api/esg/ghg_inv") ||
