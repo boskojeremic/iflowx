@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 
 export default function InviteClient({ token }: { token: string }) {
   const [email, setEmail] = useState<string>("");
-  const [displayName, setDisplayName] = useState<string>("");
   const [tenantLabel, setTenantLabel] = useState<string>("");
   const [role, setRole] = useState<string>("");
 
@@ -42,7 +41,6 @@ export default function InviteClient({ token }: { token: string }) {
         setEmail(String(d.email || ""));
         setTenantLabel(`${d.tenant?.name ?? ""} (${d.tenant?.code ?? ""})`);
         setRole(String(d.role || ""));
-        setDisplayName(String(d.name || ""));
 
         setStatus("ready");
       } catch (e) {
@@ -115,11 +113,6 @@ export default function InviteClient({ token }: { token: string }) {
           <div>
             <b>Email:</b> {email}
           </div>
-          {displayName ? (
-            <div>
-              <b>Name:</b> {displayName}
-            </div>
-          ) : null}
           <div>
             <b>Role:</b> {role}
           </div>
